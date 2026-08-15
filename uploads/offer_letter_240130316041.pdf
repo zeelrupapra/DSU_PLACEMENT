@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <title>Official Placement Offer Letter - Aarav Mehta</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f8fafc; margin: 0; padding: 40px; color: #1e293b; }
+        .container { max-width: 750px; margin: 0 auto; background: #ffffff; padding: 48px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #10b981; padding-bottom: 24px; margin-bottom: 32px; }
+        .logo { font-size: 24px; font-weight: 900; color: #065f46; letter-spacing: -0.5px; }
+        .stamp { background: #ecfdf5; border: 2px solid #10b981; color: #047857; font-weight: 800; padding: 8px 16px; border-radius: 12px; font-size: 13px; text-transform: uppercase; }
+        .title { font-size: 22px; font-weight: 800; color: #0f172a; margin-bottom: 16px; }
+        .candidate-card { background: #f1f5f9; padding: 20px; border-radius: 14px; margin: 24px 0; border-left: 4px solid #3b82f6; }
+        .candidate-card p { margin: 6px 0; font-size: 14px; font-weight: 600; color: #334155; }
+        .details-table { width: 100%; border-collapse: collapse; margin: 24px 0; }
+        .details-table th, .details-table td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
+        .details-table th { background: #f8fafc; color: #64748b; font-weight: 800; }
+        .footer { margin-top: 40px; padding-top: 24px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748B; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class='container'>
+        <div class='header'>
+            <div class='logo'>🏢 Google India Pvt Ltd (₹24.5 LPA)</div>
+            <div class='stamp'>✓ VERIFIED PLACEMENT OFFER</div>
+        </div>
+
+        <div class='title'>OFFICIAL CAMPUS PLACEMENT OFFER LETTER</div>
+        <p>Date: <strong>August 15, 2026</strong></p>
+
+        <p>Dear <strong>Aarav Mehta</strong>,</p>
+
+        <p>Following your successful performance in the Campus Recruitment Drive conducted in collaboration with <strong>Dr. Subhash University Training & Placement Cell</strong>, we are delighted to offer you the position of <strong>Software Development Associate</strong> at <strong>Google India Pvt Ltd (₹24.5 LPA)</strong>.</p>
+
+        <div class='candidate-card'>
+            <p>👤 <strong>Candidate Name:</strong> Aarav Mehta</p>
+            <p>🎓 <strong>Enrollment Number:</strong> 240130316041</p>
+            <p>📚 <strong>Branch & Batch:</strong> CSE (Batch 2024)</p>
+            <p>🏢 <strong>Recruiter Company & CTC:</strong> Google India Pvt Ltd (₹24.5 LPA)</p>
+        </div>
+
+        <table class='details-table'>
+            <thead>
+                <tr>
+                    <th>Offer Parameter</th>
+                    <th>Details / Terms</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Designation / Role</strong></td>
+                    <td>Associate Software Engineer / Technical Analyst</td>
+                </tr>
+                <tr>
+                    <td><strong>Compensation Package</strong></td>
+                    <td>As per verified Campus Selection drive CTC Package</td>
+                </tr>
+                <tr>
+                    <td><strong>Joining Location</strong></td>
+                    <td>Pan-India Tech Hubs (Bengaluru / Pune / Hyderabad / Remote)</td>
+                </tr>
+                <tr>
+                    <td><strong>Issuing Authority</strong></td>
+                    <td>Head of Campus Talent Acquisition & Training Cell</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p>We welcome you to our organization and look forward to your valuable contributions towards technological innovation!</p>
+
+        <div style='margin-top: 40px; display: flex; justify-content: space-between;'>
+            <div>
+                <p style='margin-bottom: 40px;'><strong>Authorized Signature:</strong></p>
+                <p>___________________________<br><strong>Head of Corporate HR & Recruitment</strong><br>Google India Pvt Ltd (₹24.5 LPA)</p>
+            </div>
+            <div>
+                <p style='margin-bottom: 40px;'><strong>University Endorsement:</strong></p>
+                <p>___________________________<br><strong>Training & Placement Officer</strong><br>Dr. Subhash University, Junagadh</p>
+            </div>
+        </div>
+
+        <div class='footer'>
+            Official Campus Placement Dispatch • Dr. Subhash University Placement Cell • Document Ref: DSU-OFFER-240130316041-2026
+        </div>
+    </div>
+</body>
+</html>
