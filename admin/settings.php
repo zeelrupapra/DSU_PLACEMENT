@@ -232,6 +232,33 @@ include __DIR__ . '/../includes/header.php';
                 </div>
             </div>
 
+            <!-- Feature 4: TPO Higher Package Placement Policy Controls -->
+            <div style="background: #F8FAFC; border: 1px solid #BFDBFE; border-radius: 16px; padding: 20px; margin-top: 20px; margin-bottom: 20px;">
+                <h4 style="font-size: 15px; font-weight: 800; color: #1E40AF; margin-top: 0; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                    🛡️ TPO Controls: Higher Package Dream Placement Policy
+                </h4>
+                <p style="font-size: 12px; color: #475569; margin-bottom: 14px;">Allows placed candidates to re-apply for dream companies offering a significantly higher salary package.</p>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                    <div class="form-group" style="margin: 0;">
+                        <label style="font-weight: 700; font-size: 12px; color: #334155; margin-bottom: 4px; display: block;">Policy Status</label>
+                        <select name="settings[higher_package_policy_enabled]" class="form-control" style="border-radius: 10px; font-weight: 700;">
+                            <option value="1" <?= (isset($settings['higher_package_policy_enabled']) && $settings['higher_package_policy_enabled']==='1')?'selected':''; ?>>🟢 Enabled (Dream Offers Allowed)</option>
+                            <option value="0" <?= (isset($settings['higher_package_policy_enabled']) && $settings['higher_package_policy_enabled']==='0')?'selected':''; ?>>🔴 Disabled (Strict Single Placement Lock)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="margin: 0;">
+                        <label style="font-weight: 700; font-size: 12px; color: #334155; margin-bottom: 4px; display: block;">Required Package CTC Multiplier</label>
+                        <select name="settings[higher_package_min_multiplier]" class="form-control" style="border-radius: 10px; font-weight: 700;">
+                            <option value="1.20" <?= (isset($settings['higher_package_min_multiplier']) && $settings['higher_package_min_multiplier']==='1.20')?'selected':''; ?>>1.20x (≥ 20% Salary Jump)</option>
+                            <option value="1.30" <?= (!isset($settings['higher_package_min_multiplier']) || $settings['higher_package_min_multiplier']==='1.30')?'selected':''; ?>>1.30x (≥ 30% Salary Jump - Standard TPO)</option>
+                            <option value="1.50" <?= (isset($settings['higher_package_min_multiplier']) && $settings['higher_package_min_multiplier']==='1.50')?'selected':''; ?>>1.50x (≥ 50% Salary Jump)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
             <button type="submit" class="btn-primary" style="border-radius: 12px; padding: 12px 24px; font-weight: 800; font-size: 14px; width: 100%; justify-content: center; box-shadow: 0 4px 14px rgba(59,130,246,0.3);">
                 💾 Save SMTP & Portal Configurations
             </button>

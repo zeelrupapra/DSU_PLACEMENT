@@ -17,13 +17,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $location = sanitize($_POST['location']);
         $minCpi = floatval($_POST['min_cpi']);
         $branches = sanitize($_POST['allowed_branches']);
+        $semesters = isset($_POST['allowed_semesters']) ? sanitize($_POST['allowed_semesters']) : '5,6,7,8';
         $driveDate = sanitize($_POST['drive_date']);
         $deadline = sanitize($_POST['deadline']);
         $desc = sanitize($_POST['description']);
+        $packageNumeric = parsePackageNumeric($package);
 
-        $stmt = $pdo->prepare("INSERT INTO drives (company_id, title, designation, package_ctc, location, min_cpi, allowed_branches, drive_date, deadline, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$companyId, $title, $designation, $package, $location, $minCpi, $branches, $driveDate, $deadline, $desc]);
-        $msg = "New recruitment drive published successfully!";
+        $stmt = $pdo->prepare("INSERT INTO drives (company_id, title, designation, package_ctc, package_numeric, location, min_cpi, allowed_branches, allowed_semesters, drive_date, deadline, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$companyId, $title, $designation, $package, $packageNumeric, $location, $minCpi, $branches, $semesters, $driveDate, $deadline, $desc]);
+        $driveId = $pdo->lastInsertId();
+
+        // Feature 3: Automated Drive Notification Emails to matching eligible students
+        $compRow = $pdo->query("SELECT company_name FROM companies WHERE id = $companyId")->fetch();
+        $compName = $compRow ? $compRow['company_name'] : 'Recruiter Partner';
+
+        $eligibleStudents = $pdo->query("SELECT * FROM students WHERE cpi >= $minCpi AND is_detained = 0")->fetchAll();
+        $notifiedCount = 0;
+        
+        $semArr = explode(',', $semesters);
+        $branchArr = array_map('trim', explode(',', strtoupper($branches)));
+
+        foreach ($eligibleStudents as $st) {
+            $stSem = intval($st['current_semester'] ?: 7);
+            $stBranch = strtoupper(trim($st['branch']));
+
+            if (in_array((string)$stSem, $semArr) && (in_array($stBranch, $branchArr) || in_array('ALL', $branchArr))) {
+                $toEmail = $st['email'];
+                $subject = "📢 New Placement Drive Announced: " . $compName . " (" . $package . ")";
+                $bodyHtml = "
+                <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #E2E8F0; border-radius: 16px; padding: 24px; background: #FFFFFF;'>
+                    <h2 style='color: #2563EB; margin-top: 0;'>🎯 New Recruitment Opportunity for " . htmlspecialchars($st['full_name']) . "!</h2>
+                    <p style='font-size: 14px; color: #334155;'>We are pleased to inform you that a new campus recruitment drive matching your CPI (" . $st['cpi'] . ") and Semester (" . $stSem . ") has been posted.</p>
+                    <div style='background: #EFF6FF; border: 1px solid #BFDBFE; padding: 16px; border-radius: 12px; margin: 16px 0;'>
+                        <p style='margin: 0 0 6px 0;'><strong>Company:</strong> " . htmlspecialchars($compName) . "</p>
+                        <p style='margin: 0 0 6px 0;'><strong>Role / Title:</strong> " . htmlspecialchars($title) . " (" . htmlspecialchars($designation) . ")</p>
+                        <p style='margin: 0 0 6px 0;'><strong>Package CTC:</strong> <strong style='color:#10B981;'>" . htmlspecialchars($package) . "</strong></p>
+                        <p style='margin: 0 0 6px 0;'><strong>Drive Date:</strong> " . htmlspecialchars($driveDate) . "</p>
+                        <p style='margin: 0;'><strong>Application Deadline:</strong> " . htmlspecialchars($deadline) . "</p>
+                    </div>
+                    <div style='text-align: center; margin-top: 20px;'>
+                        <a href='http://localhost/DSU/index.php' style='background: #2563EB; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;'>Login & Apply Now</a>
+                    </div>
+                </div>";
+                sendPortalEmail($toEmail, $subject, $bodyHtml, $pdo);
+                $notifiedCount++;
+            }
+        }
+
+        $msg = "New recruitment drive published! Automated notification emails dispatched to $notifiedCount eligible candidate(s).";
     } elseif ($action === 'update_app_status') {
         $appId = intval($_POST['app_id']);
         $newStatus = sanitize($_POST['status']);
@@ -284,9 +325,15 @@ include __DIR__ . '/../includes/header.php';
                     <input type="text" name="location" class="form-control" value="Pan India / Remote">
                 </div>
             </div>
-            <div class="form-group">
-                <label>Allowed Branches</label>
-                <input type="text" name="allowed_branches" class="form-control" value="CSE, IT, ECE, MECH, CIVIL">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="form-group">
+                    <label>Allowed Branches</label>
+                    <input type="text" name="allowed_branches" class="form-control" value="CSE, IT, ECE, MECH, CIVIL">
+                </div>
+                <div class="form-group">
+                    <label>Allowed Semesters</label>
+                    <input type="text" name="allowed_semesters" class="form-control" value="5,6,7,8" placeholder="e.g. 5,6,7,8 or 7,8">
+                </div>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                 <div class="form-group">

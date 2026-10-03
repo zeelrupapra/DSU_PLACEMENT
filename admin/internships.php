@@ -69,6 +69,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $pdo->prepare("UPDATE internships SET company_name = ?, title = ?, stipend = ?, start_date = ?, end_date = ?, certificate_file = ?, status = ? WHERE id = ?");
         $stmt->execute([$companyName, $title, $stipend, $startDate, $endDate, $certFile, $status, $internshipId]);
         $msg = "Student internship record updated successfully!";
+    } elseif ($action === 'verify_internship') {
+        $internshipId = intval($_POST['internship_id']);
+        $verStatus = sanitize($_POST['verification_status']);
+        $credits = intval($_POST['credit_points']);
+        $remarks = sanitize($_POST['faculty_remarks']);
+
+        $stmtVer = $pdo->prepare("UPDATE internships SET verification_status = ?, credit_points = ?, faculty_remarks = ? WHERE id = ?");
+        $stmtVer->execute([$verStatus, $credits, $remarks, $internshipId]);
+        $msg = "Faculty evaluation complete: Internship status set to $verStatus ($credits Academic Credits awarded).";
     } elseif ($action === 'delete_internship') {
         $internshipId = intval($_POST['internship_id']);
         $stmt = $pdo->prepare("DELETE FROM internships WHERE id = ?");
@@ -240,9 +249,22 @@ include __DIR__ . '/../includes/header.php';
                             </td>
                             <td style="padding: 14px 16px;">
                                 <span class="badge-status placed" style="font-weight: 800;"><?= htmlspecialchars($it['status']); ?></span>
+                                <div style="margin-top: 4px;">
+                                    <?php 
+                                        $vSt = $it['verification_status'] ?: 'Pending';
+                                        $vCls = ($vSt==='Verified')?'placed':(($vSt==='Rejected')?'unplaced':'in-process');
+                                    ?>
+                                    <span class="badge-status <?= $vCls; ?>" style="font-size: 11px; padding: 2px 8px;">
+                                        <?= $vSt; ?> (<?= intval($it['credit_points']?:3); ?> Credits)
+                                    </span>
+                                </div>
                             </td>
                             <td style="text-align: right; border-top-right-radius: 16px; border-bottom-right-radius: 16px; padding: 14px 16px; white-space: nowrap;">
                                 <div class="action-btn-group">
+                                    <button class="btn-action-icon edit" onclick="openFacultyEvalModal(<?= $it['id']; ?>, '<?= htmlspecialchars($it['verification_status']?:'Verified', ENT_QUOTES); ?>', <?= intval($it['credit_points']?:3); ?>, '<?= htmlspecialchars($it['faculty_remarks']?:'', ENT_QUOTES); ?>')" title="Faculty Credit Evaluation" style="padding: 6px 12px; height: 36px; border-radius: 10px; font-weight: 800; background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; cursor: pointer;">
+                                        🎓 Faculty Verify
+                                    </button>
+                                    
                                     <button class="btn-action-icon edit" onclick="openEditInternshipModal(<?= $jsonString; ?>)" title="Edit Internship Details" style="padding: 6px 12px; height: 36px; border-radius: 10px; font-weight: 800; background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; cursor: pointer;">
                                         ✏️ Edit
                                     </button>
@@ -251,7 +273,7 @@ include __DIR__ . '/../includes/header.php';
                                         <input type="hidden" name="action" value="delete_internship">
                                         <input type="hidden" name="internship_id" value="<?= $it['id']; ?>">
                                         <button type="submit" class="btn-action-icon delete" title="Delete Internship" style="padding: 6px 12px; height: 36px; border-radius: 10px; font-weight: 800; cursor: pointer;">
-                                            🗑️ Delete
+                                            🗑️
                                         </button>
                                     </form>
                                 </div>
@@ -396,7 +418,58 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
+<!-- Modal 3: Faculty Verification & Academic Credit Evaluation Modal -->
+<div class="modal-overlay" id="facultyEvalModal">
+    <div class="modal-box" style="max-width: 480px; border-radius: 24px; padding: 28px;">
+        <div class="modal-header" style="margin-bottom: 20px;">
+            <h3 style="font-size: 18px; font-weight: 800; color: #0F172A;">🎓 Faculty Internship & Credit Verification</h3>
+            <button class="close-modal" onclick="closeModal('facultyEvalModal')">&times;</button>
+        </div>
+        <form method="POST">
+            <input type="hidden" name="action" value="verify_internship">
+            <input type="hidden" name="internship_id" id="eval_internship_id">
+            
+            <div class="form-group" style="margin-bottom: 16px;">
+                <label style="font-weight: 800; font-size: 13px; color: #334155; display: block; margin-bottom: 6px;">Verification Decision *</label>
+                <select name="verification_status" id="eval_status" class="form-control" style="border-radius: 10px; font-weight: 700;">
+                    <option value="Verified">🟢 Verified & Approved</option>
+                    <option value="Pending">🟡 Pending Verification</option>
+                    <option value="Rejected">🔴 Rejected</option>
+                </select>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 16px;">
+                <label style="font-weight: 800; font-size: 13px; color: #334155; display: block; margin-bottom: 6px;">Academic Credit Score Allocation *</label>
+                <select name="credit_points" id="eval_credits" class="form-control" style="border-radius: 10px; font-weight: 700;">
+                    <option value="2">2 Academic Credits</option>
+                    <option value="3" selected>3 Academic Credits (Standard)</option>
+                    <option value="4">4 Academic Credits</option>
+                    <option value="6">6 Academic Credits (Major Semester Project)</option>
+                </select>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label style="font-weight: 800; font-size: 13px; color: #334155; display: block; margin-bottom: 6px;">Faculty Audit Remarks</label>
+                <textarea name="faculty_remarks" id="eval_remarks" class="form-control" rows="3" placeholder="Certificate verified against company seal..." style="border-radius: 10px;"></textarea>
+            </div>
+
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button type="button" class="btn-secondary" onclick="closeModal('facultyEvalModal')" style="padding: 10px 18px;">Cancel</button>
+                <button type="submit" class="btn-primary" style="padding: 10px 22px; background: #047857; border: none;">Save Faculty Evaluation</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
+function openFacultyEvalModal(id, status, credits, remarks) {
+    document.getElementById('eval_internship_id').value = id;
+    document.getElementById('eval_status').value = status || 'Verified';
+    document.getElementById('eval_credits').value = credits || 3;
+    document.getElementById('eval_remarks').value = remarks || '';
+    openModal('facultyEvalModal');
+}
+
 function openEditInternshipModal(data) {
     document.getElementById('edit_internship_id').value = data.id;
     document.getElementById('edit_student_name').value = data.full_name + ' (' + data.enrollment_no + ' - ' + data.branch + ')';

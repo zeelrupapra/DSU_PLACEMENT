@@ -35,10 +35,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Refresh student record
         $stmtSt->execute([$studentId]);
         $student = $stmtSt->fetch();
+    } elseif ($action === 'submit_off_campus') {
+        $companyName = sanitize($_POST['off_company_name']);
+        $designation = sanitize($_POST['off_designation']);
+        $packageCtc = sanitize($_POST['off_package_ctc']);
+        $packageNum = parsePackageNumeric($packageCtc);
+
+        if (isset($_FILES['off_offer_letter']) && $_FILES['off_offer_letter']['error'] === UPLOAD_ERR_OK) {
+            $ext = strtolower(pathinfo($_FILES['off_offer_letter']['name'], PATHINFO_EXTENSION));
+            if (in_array($ext, ['pdf', 'png', 'jpg', 'jpeg', 'doc', 'docx'])) {
+                $offerName = 'offcampus_offer_' . $_SESSION['enrollment_no'] . '_' . time() . '.' . $ext;
+                move_uploaded_file($_FILES['off_offer_letter']['tmp_name'], __DIR__ . '/../uploads/' . $offerName);
+
+                $stmtOff = $pdo->prepare("INSERT INTO off_campus_placements (student_id, company_name, designation, package_ctc, package_numeric, offer_letter, status) VALUES (?, ?, ?, ?, ?, ?, 'Pending')");
+                $stmtOff->execute([$studentId, $companyName, $designation, $packageCtc, $packageNum, $offerName]);
+                $msg = "Off-campus placement offer submitted successfully! Pending TPO Verification.";
+            } else {
+                $error = "Offer letter document must be PDF or image format!";
+            }
+        } else {
+            $error = "Please attach your off-campus offer letter document!";
+        }
     } else {
         $phone = sanitize($_POST['phone']);
         $cpi = floatval($_POST['cpi']);
         $gender = sanitize($_POST['gender']);
+        $semester = isset($_POST['current_semester']) ? intval($_POST['current_semester']) : 7;
+        $linkedinUrl = isset($_POST['linkedin_url']) ? sanitize($_POST['linkedin_url']) : '';
 
         $profilePhoto = null;
         $resumeFile = null;
@@ -82,8 +105,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if (!$error) {
-            $sql = "UPDATE students SET phone = ?, cpi = ?, gender = ?";
-            $params = [$phone, $cpi, $gender];
+            $sql = "UPDATE students SET phone = ?, cpi = ?, gender = ?, current_semester = ?, linkedin_url = ?";
+            $params = [$phone, $cpi, $gender, $semester, $linkedinUrl];
 
             if ($profilePhoto) {
                 $sql .= ", profile_photo = ?";
@@ -166,12 +189,20 @@ include __DIR__ . '/../includes/header.php';
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 20px;">
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px;">
                 <div class="form-group" style="margin: 0;">
                     <label style="font-weight: 700; font-size: 12px; color: #475569; margin-bottom: 6px; display: block;">Gender</label>
                     <select name="gender" class="form-control" style="border-radius: 10px; padding: 9px 12px;">
                         <option value="Male" <?= ($student['gender']==='Male')?'selected':''; ?>>Male</option>
                         <option value="Female" <?= ($student['gender']==='Female')?'selected':''; ?>>Female</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin: 0;">
+                    <label style="font-weight: 700; font-size: 12px; color: #475569; margin-bottom: 6px; display: block;">Current Semester *</label>
+                    <select name="current_semester" class="form-control" style="border-radius: 10px; padding: 9px 12px; font-weight: 700;">
+                        <?php for($s=1; $s<=8; $s++): ?>
+                            <option value="<?= $s; ?>" <?= (intval($student['current_semester']?:7)===$s)?'selected':''; ?>>Semester <?= $s; ?></option>
+                        <?php endfor; ?>
                     </select>
                 </div>
                 <div class="form-group" style="margin: 0;">
@@ -182,6 +213,11 @@ include __DIR__ . '/../includes/header.php';
                     <label style="font-weight: 700; font-size: 12px; color: #475569; margin-bottom: 6px; display: block;">Phone Number *</label>
                     <input type="text" name="phone" class="form-control" value="<?= htmlspecialchars($student['phone']); ?>" required style="border-radius: 10px; padding: 9px 12px;">
                 </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label style="font-weight: 700; font-size: 12px; color: #0A66C2; margin-bottom: 6px; display: block;">🔗 LinkedIn Profile URL</label>
+                <input type="url" name="linkedin_url" class="form-control" value="<?= htmlspecialchars($student['linkedin_url'] ?: ''); ?>" placeholder="https://www.linkedin.com/in/your-profile" style="border-radius: 10px; padding: 10px 14px;">
             </div>
 
             <!-- Single Resume Upload / Replace Box -->
@@ -293,9 +329,96 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                 </div>
             <?php endif; ?>
+
+            <!-- Feature 5: Off-Campus Placement Offer Submission Card -->
+            <?php
+                $offCampusOffers = $pdo->query("SELECT * FROM off_campus_placements WHERE student_id = $studentId ORDER BY id DESC")->fetchAll();
+            ?>
+            <div style="background: white; border: 1px solid #E2E8F0; border-radius: 20px; padding: 22px; margin-top: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                    <div>
+                        <h4 style="font-weight: 800; font-size: 15px; color: #0F172A; margin: 0; display: flex; align-items: center; gap: 8px;">
+                            💼 Submit Off-Campus Job Offer
+                        </h4>
+                        <p style="font-size: 12px; color: #64748B; margin-top: 2px;">Record external job offers for official TPO verification and approval.</p>
+                    </div>
+                    <button class="btn-primary" onclick="openModal('submitOffCampusModal')" style="font-size: 12px; padding: 8px 14px; border-radius: 10px;">
+                        + Submit Off-Campus Offer
+                    </button>
+                </div>
+
+                <?php if (!empty($offCampusOffers)): ?>
+                    <div class="table-responsive">
+                        <table class="custom-table" style="font-size: 13px;">
+                            <thead>
+                                <tr>
+                                    <th>Recruiter Enterprise</th>
+                                    <th>Role Title</th>
+                                    <th>Offered CTC</th>
+                                    <th>TPO Verification</th>
+                                    <th>Offer File</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($offCampusOffers as $off): ?>
+                                    <tr>
+                                        <td><strong><?= htmlspecialchars($off['company_name']); ?></strong></td>
+                                        <td><?= htmlspecialchars($off['designation']); ?></td>
+                                        <td><strong style="color: #10B981;"><?= htmlspecialchars($off['package_ctc']); ?></strong></td>
+                                        <td>
+                                            <?php 
+                                                $stCls = ($off['status']==='Approved')?'placed':(($off['status']==='Rejected')?'unplaced':'in-process');
+                                            ?>
+                                            <span class="badge-status <?= $stCls; ?>"><?= htmlspecialchars($off['status']); ?></span>
+                                        </td>
+                                        <td>
+                                            <a href="../uploads/<?= htmlspecialchars($off['offer_letter']); ?>" target="_blank" style="color: #2563EB; font-weight: 700;">📄 View Letter</a>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
         </div>
     </div>
 
+</div>
+
+<!-- Off-Campus Placement Modal -->
+<div class="modal-overlay" id="submitOffCampusModal">
+    <div class="modal-box" style="max-width: 500px; border-radius: 24px; padding: 28px;">
+        <div class="modal-header" style="margin-bottom: 20px;">
+            <h3 style="font-size: 18px; font-weight: 800; color: #0F172A;">💼 Record Off-Campus Job Offer</h3>
+            <button class="close-modal" onclick="closeModal('submitOffCampusModal')">&times;</button>
+        </div>
+        <form method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="action" value="submit_off_campus">
+            <div class="form-group">
+                <label>Company / Enterprise Name *</label>
+                <input type="text" name="off_company_name" class="form-control" placeholder="e.g. Goldman Sachs India" required>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="form-group">
+                    <label>Designation / Role *</label>
+                    <input type="text" name="off_designation" class="form-control" placeholder="e.g. Software Analyst" required>
+                </div>
+                <div class="form-group">
+                    <label>Package CTC Offered *</label>
+                    <input type="text" name="off_package_ctc" class="form-control" placeholder="e.g. ₹18.50 LPA" required>
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label>Upload Official Offer Letter Document * (PDF / Image)</label>
+                <input type="file" name="off_offer_letter" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" class="form-control" required>
+            </div>
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button type="button" class="btn-secondary" onclick="closeModal('submitOffCampusModal')" style="padding: 10px 18px;">Cancel</button>
+                <button type="submit" class="btn-primary" style="padding: 10px 22px;">📤 Submit for TPO Approval</button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <script>

@@ -77,7 +77,8 @@ function ensureSchemaExists($pdo) {
                 `id` INT AUTO_INCREMENT PRIMARY KEY,
                 `username` VARCHAR(100) NOT NULL UNIQUE,
                 `password` VARCHAR(255) NOT NULL,
-                `role` ENUM('admin', 'student') NOT NULL DEFAULT 'student',
+                `role` ENUM('admin', 'student', 'recruiter') NOT NULL DEFAULT 'student',
+                `company_id` INT DEFAULT NULL,
                 `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
@@ -90,9 +91,11 @@ function ensureSchemaExists($pdo) {
                 `phone` VARCHAR(20) DEFAULT NULL,
                 `gender` ENUM('Male', 'Female') DEFAULT 'Male',
                 `branch` VARCHAR(50) NOT NULL,
+                `current_semester` INT DEFAULT 7,
                 `cpi` DECIMAL(4,2) DEFAULT 0.00,
                 `backlogs` INT DEFAULT 0,
                 `batch_year` INT NOT NULL,
+                `linkedin_url` VARCHAR(255) DEFAULT NULL,
                 `resume_file` VARCHAR(255) DEFAULT 'default_resume.pdf',
                 `offer_letter` VARCHAR(255) DEFAULT NULL,
                 `placed_companies` VARCHAR(255) DEFAULT NULL,
@@ -122,9 +125,11 @@ function ensureSchemaExists($pdo) {
                 `title` VARCHAR(200) NOT NULL,
                 `designation` VARCHAR(150) NOT NULL,
                 `package_ctc` VARCHAR(50) NOT NULL,
+                `package_numeric` DECIMAL(10,2) DEFAULT 0.00,
                 `location` VARCHAR(100) DEFAULT 'Pan India / Remote',
                 `min_cpi` DECIMAL(4,2) DEFAULT 6.50,
                 `allowed_branches` VARCHAR(255) DEFAULT 'CSE, IT, ECE, MECH, CIVIL',
+                `allowed_semesters` VARCHAR(100) DEFAULT '5,6,7,8',
                 `max_backlogs` INT DEFAULT 0,
                 `drive_date` DATE NOT NULL,
                 `deadline` DATE NOT NULL,
@@ -147,8 +152,24 @@ function ensureSchemaExists($pdo) {
                 FOREIGN KEY (`student_id`) REFERENCES `students`(`id`) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
+            $pdo->exec("CREATE TABLE IF NOT EXISTS `off_campus_placements` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `student_id` INT NOT NULL,
+                `company_name` VARCHAR(150) NOT NULL,
+                `designation` VARCHAR(150) NOT NULL,
+                `package_ctc` VARCHAR(50) NOT NULL,
+                `package_numeric` DECIMAL(10,2) DEFAULT 0.00,
+                `offer_letter` VARCHAR(255) NOT NULL,
+                `status` ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Pending',
+                `remarks` TEXT DEFAULT NULL,
+                `submitted_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                `verified_at` DATETIME DEFAULT NULL,
+                FOREIGN KEY (`student_id`) REFERENCES `students`(`id`) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
             $pdo->exec("CREATE TABLE IF NOT EXISTS `workshops` (
                 `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `company_id` INT DEFAULT NULL,
                 `title` VARCHAR(200) NOT NULL,
                 `speaker` VARCHAR(150) NOT NULL,
                 `event_date` DATETIME NOT NULL,
@@ -157,7 +178,8 @@ function ensureSchemaExists($pdo) {
                 `description` TEXT DEFAULT NULL,
                 `report_file` VARCHAR(255) DEFAULT NULL,
                 `status` ENUM('Upcoming', 'Completed', 'Cancelled') DEFAULT 'Upcoming',
-                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (`company_id`) REFERENCES `companies`(`id`) ON DELETE SET NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
             $pdo->exec("CREATE TABLE IF NOT EXISTS `workshop_registrations` (
@@ -182,6 +204,9 @@ function ensureSchemaExists($pdo) {
                 `end_date` DATE NOT NULL,
                 `certificate_file` VARCHAR(255) DEFAULT 'certificate_sample.pdf',
                 `status` ENUM('Ongoing', 'Completed') DEFAULT 'Completed',
+                `verification_status` ENUM('Pending', 'Verified', 'Rejected') DEFAULT 'Pending',
+                `credit_points` INT DEFAULT 3,
+                `faculty_remarks` TEXT DEFAULT NULL,
                 `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (`student_id`) REFERENCES `students`(`id`) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
@@ -229,6 +254,10 @@ function ensureSchemaExists($pdo) {
             $pdo->exec("INSERT IGNORE INTO `users` (`username`, `password`, `role`) VALUES ('admin', '$adminPass', 'admin')");
             $pdo->exec("INSERT IGNORE INTO `users` (`username`, `password`, `role`) VALUES ('admin@drsubhash.edu.in', '$adminPass', 'admin')");
 
+            // Seed default settings for TPO controls
+            $pdo->exec("INSERT IGNORE INTO `settings` (`setting_key`, `setting_value`) VALUES ('higher_package_policy_enabled', '1')");
+            $pdo->exec("INSERT IGNORE INTO `settings` (`setting_key`, `setting_value`) VALUES ('higher_package_min_multiplier', '1.30')");
+
             // Auto-trigger full seeding if reset script is available
             $seedScript = __DIR__ . '/../scratch/reset_and_seed.php';
             if (!file_exists($seedScript)) {
@@ -240,10 +269,19 @@ function ensureSchemaExists($pdo) {
         }
 
         // Auto Column Migration Checks
+        try { $pdo->exec("ALTER TABLE `users` ADD COLUMN `company_id` INT DEFAULT NULL"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE `students` ADD COLUMN `current_semester` INT DEFAULT 7"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE `students` ADD COLUMN `linkedin_url` VARCHAR(255) DEFAULT NULL"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE `students` ADD COLUMN `offer_letter` VARCHAR(255) DEFAULT NULL"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE `students` ADD COLUMN `placed_companies` VARCHAR(255) DEFAULT NULL"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE `drives` ADD COLUMN `allowed_semesters` VARCHAR(100) DEFAULT '5,6,7,8'"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE `drives` ADD COLUMN `package_numeric` DECIMAL(10,2) DEFAULT 0.00"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE `workshops` ADD COLUMN `company_id` INT DEFAULT NULL"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE `workshops` ADD COLUMN `report_file` VARCHAR(255) DEFAULT NULL"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE `workshop_registrations` ADD COLUMN `attendance_status` VARCHAR(50) DEFAULT 'Registered'"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE `internships` ADD COLUMN `verification_status` ENUM('Pending', 'Verified', 'Rejected') DEFAULT 'Pending'"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE `internships` ADD COLUMN `credit_points` INT DEFAULT 3"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE `internships` ADD COLUMN `faculty_remarks` TEXT DEFAULT NULL"); } catch (Exception $e) {}
 
     } catch (PDOException $e) {
         // Non-fatal safety fallback
@@ -263,9 +301,27 @@ function isStudent() {
     return isAuthenticated() && isset($_SESSION['role']) && $_SESSION['role'] === 'student' && isset($_SESSION['student_id']);
 }
 
-// Single Placement Policy Helper: Enforces 1 Student = 1 Selected Company Limit
+function isRecruiter() {
+    return isAuthenticated() && isset($_SESSION['role']) && $_SESSION['role'] === 'recruiter' && isset($_SESSION['company_id']);
+}
+
+// Numeric CTC Parser Helper (e.g. "12.5 LPA" -> 12.50, "₹8,000,000" -> 80.00)
+function parsePackageNumeric($pkgStr) {
+    if (empty($pkgStr)) return 0.00;
+    if (preg_match('/([0-9]+(?:\.[0-9]+)?)\s*LPA/i', $pkgStr, $m)) {
+        return (float)$m[1];
+    }
+    if (preg_match('/([0-9,]+)/', $pkgStr, $m)) {
+        $num = (float)str_replace(',', '', $m[1]);
+        if ($num > 10000) { $num = $num / 100000; } // Convert raw CTC to LPA
+        return $num;
+    }
+    return 0.00;
+}
+
+// Single Placement & Higher Package Placement Policy (TPO Controls) Helper
 function canSelectStudentForCompany($pdo, $studentId, $targetDriveId = 0) {
-    $stmt = $pdo->prepare("SELECT s.full_name, s.placement_status, s.placed_companies, a.drive_id, d.title, c.company_name 
+    $stmt = $pdo->prepare("SELECT s.full_name, s.placement_status, s.placed_companies, a.drive_id, d.title, d.package_ctc, d.package_numeric, c.company_name 
                            FROM students s 
                            LEFT JOIN applications a ON s.id = a.student_id AND a.status = 'Selected' 
                            LEFT JOIN drives d ON a.drive_id = d.id 
@@ -279,10 +335,42 @@ function canSelectStudentForCompany($pdo, $studentId, $targetDriveId = 0) {
         if ($targetDriveId > 0 && $st['drive_id'] == $targetDriveId) {
             return ['allowed' => true];
         }
+
+        // Feature 4: Check Higher Package Placement Policy (TPO Controls)
+        $policyEnabled = 1;
+        $multiplier = 1.30;
+        try {
+            $rowPol = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'higher_package_policy_enabled'")->fetch();
+            if ($rowPol) $policyEnabled = intval($rowPol['setting_value']);
+
+            $rowMult = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'higher_package_min_multiplier'")->fetch();
+            if ($rowMult) $multiplier = floatval($rowMult['setting_value']);
+        } catch (Exception $e) {}
+
+        if ($policyEnabled && $targetDriveId > 0) {
+            $stmtTarget = $pdo->prepare("SELECT package_ctc, package_numeric FROM drives WHERE id = ?");
+            $stmtTarget->execute([$targetDriveId]);
+            $targetDrive = $stmtTarget->fetch();
+
+            if ($targetDrive) {
+                $placedCtcNum = parsePackageNumeric($st['placed_companies'] ?: $st['package_ctc']);
+                $targetCtcNum = $targetDrive['package_numeric'] > 0 ? floatval($targetDrive['package_numeric']) : parsePackageNumeric($targetDrive['package_ctc']);
+
+                if ($placedCtcNum > 0 && $targetCtcNum >= ($placedCtcNum * $multiplier)) {
+                    $percentJump = round((($targetCtcNum - $placedCtcNum) / $placedCtcNum) * 100);
+                    return [
+                        'allowed' => true,
+                        'is_dream_offer' => true,
+                        'reason' => "🎉 Dream Company Exception: Candidate is allowed to apply/select due to a +{$percentJump}% CTC jump (TPO Higher Package Policy active)."
+                    ];
+                }
+            }
+        }
+
         $companyName = !empty($st['placed_companies']) ? $st['placed_companies'] : ($st['company_name'] ?: 'another company');
         return [
             'allowed' => false,
-            'reason' => "⚠️ Single Placement Lock: Candidate " . $st['full_name'] . " is ALREADY PLACED at " . $companyName . "! A student can only be selected in ONE company."
+            'reason' => "⚠️ Single Placement Lock: Candidate " . $st['full_name'] . " is ALREADY PLACED at " . $companyName . "! (TPO Higher Package Policy requires ≥ 30% CTC jump for dream offers)."
         ];
     }
     return ['allowed' => true];
@@ -297,7 +385,36 @@ function requireAdmin() {
         header("Location: ../student/dashboard.php");
         exit;
     }
+    if (isRecruiter()) {
+        header("Location: ../recruiter/dashboard.php");
+        exit;
+    }
     if (!isAdmin()) {
+        $_SESSION = array();
+        if (ini_get("session.use_cookies")) {
+            $params = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000, $params["path"], $params["domain"], $params["secure"], $params["httponly"]);
+        }
+        session_destroy();
+        header("Location: ../index.php?error=unauthorized");
+        exit;
+    }
+}
+
+function requireRecruiter() {
+    if (!isAuthenticated()) {
+        header("Location: ../index.php?error=unauthorized");
+        exit;
+    }
+    if (isAdmin()) {
+        header("Location: ../admin/dashboard.php");
+        exit;
+    }
+    if (isStudent()) {
+        header("Location: ../student/dashboard.php");
+        exit;
+    }
+    if (!isRecruiter()) {
         $_SESSION = array();
         if (ini_get("session.use_cookies")) {
             $params = session_get_cookie_params();

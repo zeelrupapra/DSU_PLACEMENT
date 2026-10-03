@@ -48,7 +48,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // 2. Attempt Student Authentication
+    // 2. Attempt Recruiter Authentication
+    $stmtRecruiter = $pdo->prepare("SELECT u.*, c.company_name, c.hr_name FROM users u JOIN companies c ON u.company_id = c.id WHERE (u.username = ? OR c.hr_email = ?) AND u.role = 'recruiter'");
+    $stmtRecruiter->execute([$identifier, $identifier]);
+    $recruiterUser = $stmtRecruiter->fetch();
+
+    if ($recruiterUser && (password_verify($password, $recruiterUser['password']) || $password === $recruiterUser['password'])) {
+        session_regenerate_id(true);
+        $_SESSION['user_id'] = $recruiterUser['id'];
+        $_SESSION['company_id'] = $recruiterUser['company_id'];
+        $_SESSION['company_name'] = $recruiterUser['company_name'];
+        $_SESSION['username'] = $recruiterUser['hr_name'] ?: ($recruiterUser['company_name'] . ' HR Partner');
+        $_SESSION['email'] = $recruiterUser['username'];
+        $_SESSION['role'] = 'recruiter';
+        header("Location: recruiter/dashboard.php");
+        exit;
+    }
+
+    // 3. Attempt Student Authentication
     $stmtStudent = $pdo->prepare("SELECT u.*, s.id as student_id, s.full_name, s.enrollment_no, s.email as student_email, s.is_detained 
                                   FROM users u 
                                   JOIN students s ON u.id = s.user_id 
@@ -69,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // If credentials failed for both Admin and Student
+    // If credentials failed for Admin, Recruiter, and Student
     $popupError = "Invalid User Credentials or Password. Please verify your details.";
 }
 ?>
