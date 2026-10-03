@@ -28,13 +28,13 @@ $successMsg = isset($_GET['success']) ? sanitize($_GET['success']) : '';
 
 // Process Common Unified Single Sign-On Submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $identifier = sanitize($_POST['identifier']);
+    $identifier = trim($_POST['identifier']);
     $password = $_POST['password'];
 
     $pdo = getDBConnection();
 
     // 1. Attempt Admin Authentication
-    $stmtAdmin = $pdo->prepare("SELECT * FROM users WHERE (username = ?) AND role = 'admin'");
+    $stmtAdmin = $pdo->prepare("SELECT * FROM users WHERE (LOWER(username) = LOWER(?)) AND role = 'admin'");
     $stmtAdmin->execute([$identifier]);
     $adminUser = $stmtAdmin->fetch();
 
@@ -49,7 +49,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // 2. Attempt Recruiter Authentication
-    $stmtRecruiter = $pdo->prepare("SELECT u.*, c.company_name, c.hr_name FROM users u JOIN companies c ON u.company_id = c.id WHERE (u.username = ? OR c.hr_email = ?) AND u.role = 'recruiter'");
+    $stmtRecruiter = $pdo->prepare("SELECT u.*, c.company_name, c.hr_name, c.hr_email 
+                                    FROM users u 
+                                    JOIN companies c ON u.company_id = c.id 
+                                    WHERE (LOWER(u.username) = LOWER(?) OR LOWER(c.hr_email) = LOWER(?)) AND u.role = 'recruiter'");
     $stmtRecruiter->execute([$identifier, $identifier]);
     $recruiterUser = $stmtRecruiter->fetch();
 
@@ -65,11 +68,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // 3. Attempt Student Authentication
+    // 3. Attempt Student Authentication (Mail or Enrollment No)
     $stmtStudent = $pdo->prepare("SELECT u.*, s.id as student_id, s.full_name, s.enrollment_no, s.email as student_email, s.is_detained 
                                   FROM users u 
                                   JOIN students s ON u.id = s.user_id 
-                                  WHERE (s.enrollment_no = ? OR s.email = ? OR u.username = ?) AND u.role = 'student'");
+                                  WHERE (LOWER(s.enrollment_no) = LOWER(?) OR LOWER(s.email) = LOWER(?) OR LOWER(u.username) = LOWER(?)) AND u.role = 'student'");
     $stmtStudent->execute([$identifier, $identifier, $identifier]);
     $studentUser = $stmtStudent->fetch();
 
