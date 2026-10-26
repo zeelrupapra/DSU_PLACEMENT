@@ -84,9 +84,9 @@ $currentPage = 'dashboard';
 include __DIR__ . '/../includes/header.php';
 ?>
 
-<!-- KPI Summary Cards Row -->
+<!-- KPI Summary Cards Row (Interactive & Clickable) -->
 <div class="kpi-grid">
-    <div class="kpi-card" style="animation-delay: 0.05s;">
+    <div class="kpi-card" onclick="window.location.href='students.php?view=list&year=<?= $batchFilter; ?>&status='" style="animation-delay: 0.05s; cursor: pointer; transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);" onmouseover="this.style.transform='translateY(-5px)'; this.style.boxShadow='0 14px 28px rgba(59,130,246,0.18)'; this.style.borderColor='#3B82F6';" onmouseout="this.style.transform='none'; this.style.boxShadow='none'; this.style.borderColor='var(--border-color)';" title="Click to show all students candidate roster">
         <div class="kpi-top">
             <span class="kpi-title">Total Students</span>
             <div class="kpi-icon blue">
@@ -94,10 +94,13 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
         <div class="kpi-value"><?= number_format($totalStudents); ?></div>
-        <span class="kpi-badge up">↑ <?= ($batchFilter > 0 ? $batchFilter . ' Batch' : 'All Cohorts'); ?></span>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+            <span class="kpi-badge up">↑ <?= ($batchFilter > 0 ? $batchFilter . ' Batch' : 'All Cohorts'); ?></span>
+            <span style="font-size: 11px; font-weight: 800; color: #2563EB;">Show All List ↗</span>
+        </div>
     </div>
 
-    <div class="kpi-card" style="animation-delay: 0.1s;">
+    <div class="kpi-card" onclick="window.location.href='students.php?view=list&year=<?= $batchFilter; ?>&status=Placed'" style="animation-delay: 0.1s; cursor: pointer; transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);" onmouseover="this.style.transform='translateY(-5px)'; this.style.boxShadow='0 14px 28px rgba(16,185,129,0.18)'; this.style.borderColor='#10B981';" onmouseout="this.style.transform='none'; this.style.boxShadow='none'; this.style.borderColor='var(--border-color)';" title="Click to show placed students data list">
         <div class="kpi-top">
             <span class="kpi-title">Placed Students</span>
             <div class="kpi-icon green">
@@ -105,7 +108,10 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
         <div class="kpi-value"><?= number_format($placedStudents); ?></div>
-        <span class="kpi-badge up">↑ Placed</span>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+            <span class="kpi-badge up" style="background: #ECFDF5; color: #059669;">↑ <?= round(($totalStudents>0?($placedStudents/$totalStudents)*100:0),1); ?>% Placed</span>
+            <span style="font-size: 11px; font-weight: 800; color: #059669;">Show Placed List ↗</span>
+        </div>
     </div>
 
     <div class="kpi-card" style="animation-delay: 0.15s;">
@@ -130,7 +136,7 @@ include __DIR__ . '/../includes/header.php';
         <span class="kpi-badge info">🏢 Microsoft</span>
     </div>
 
-    <div class="kpi-card" style="animation-delay: 0.25s;">
+    <div class="kpi-card" onclick="window.location.href='companies.php'" style="animation-delay: 0.25s; cursor: pointer; transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);" onmouseover="this.style.transform='translateY(-5px)'; this.style.boxShadow='0 14px 28px rgba(6,182,212,0.18)'; this.style.borderColor='#0891B2';" onmouseout="this.style.transform='none'; this.style.boxShadow='none'; this.style.borderColor='var(--border-color)';" title="Click to show active recruiter companies">
         <div class="kpi-top">
             <span class="kpi-title">Companies</span>
             <div class="kpi-icon cyan">
@@ -138,7 +144,10 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
         <div class="kpi-value"><?= number_format($totalCompanies); ?></div>
-        <span class="kpi-badge up">↑ Active Drive</span>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+            <span class="kpi-badge up">↑ Active Drive</span>
+            <span style="font-size: 11px; font-weight: 800; color: #0891B2;">View Companies ↗</span>
+        </div>
     </div>
 </div>
 

@@ -1,85 +1,8 @@
--- Dr. Subhash University Placement Portal - Full Database Backup
--- Generated on 2026-10-26 17:06:25
--- Database: dr_subhash_placement
+-- Database Backup for dr_subhash_placement
+-- Generated on 2026-10-26 18:05:21
 
-SET FOREIGN_KEY_CHECKS = 0;
-CREATE DATABASE IF NOT EXISTS `dr_subhash_placement` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS `dr_subhash_placement` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `dr_subhash_placement`;
-
-DROP TABLE IF EXISTS `settings`;
-CREATE TABLE `settings` (
-  `setting_key` varchar(100) NOT NULL,
-  `setting_value` text DEFAULT NULL,
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  PRIMARY KEY (`setting_key`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
-INSERT INTO `settings` (`setting_key`, `setting_value`, `updated_at`) VALUES ('allow_higher_package_reapply', '0', '2026-10-03 12:20:30');
-INSERT INTO `settings` (`setting_key`, `setting_value`, `updated_at`) VALUES ('higher_package_min_increment', '30', '2026-10-03 12:20:30');
-INSERT INTO `settings` (`setting_key`, `setting_value`, `updated_at`) VALUES ('higher_package_min_multiplier', '1.30', '2026-10-03 12:17:31');
-INSERT INTO `settings` (`setting_key`, `setting_value`, `updated_at`) VALUES ('higher_package_policy_enabled', '1', '2026-10-03 12:17:31');
-
-DROP TABLE IF EXISTS `companies`;
-CREATE TABLE `companies` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `company_name` varchar(150) NOT NULL,
-  `hr_name` varchar(100) DEFAULT NULL,
-  `hr_email` varchar(100) DEFAULT NULL,
-  `industry` varchar(100) DEFAULT 'IT & Software',
-  `website` varchar(150) DEFAULT NULL,
-  `phone` varchar(20) DEFAULT NULL,
-  `logo` varchar(255) DEFAULT 'default_company.png',
-  `is_closed` tinyint(1) DEFAULT 0,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `company_name` (`company_name`)
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
-INSERT INTO `companies` (`id`, `company_name`, `hr_name`, `hr_email`, `industry`, `website`, `phone`, `logo`, `is_closed`, `created_at`) VALUES ('1', 'Google India Pvt Ltd', 'Sundeep Pichai', 'hr.google@gmail.com', 'Cloud & AI Systems', 'https://careers.google.com', '+91 98250 11221', 'default_company.png', '0', '2026-10-03 12:17:31');
-INSERT INTO `companies` (`id`, `company_name`, `hr_name`, `hr_email`, `industry`, `website`, `phone`, `logo`, `is_closed`, `created_at`) VALUES ('2', 'Microsoft India', 'Satya Nadella', 'hr.microsoft@gmail.com', 'Enterprise Cloud & OS', 'https://careers.microsoft.com', NULL, 'default_company.png', '0', '2026-10-03 12:17:31');
-INSERT INTO `companies` (`id`, `company_name`, `hr_name`, `hr_email`, `industry`, `website`, `phone`, `logo`, `is_closed`, `created_at`) VALUES ('3', 'Amazon Web Services (AWS)', 'Andrew Jassy', 'hr.aws@gmail.com', 'Cloud Computing & DevOps', 'https://aws.amazon.com', '+91 98250 33443', 'default_company.png', '0', '2026-10-03 12:17:31');
-INSERT INTO `companies` (`id`, `company_name`, `hr_name`, `hr_email`, `industry`, `website`, `phone`, `logo`, `is_closed`, `created_at`) VALUES ('4', 'Tata Consultancy Services (TCS)', 'K. Krithivasan', 'hr.tcs@gmail.com', 'IT Services & Consulting', 'https://www.tcs.com', '+91 98250 44554', 'default_company.png', '0', '2026-10-03 12:17:31');
-INSERT INTO `companies` (`id`, `company_name`, `hr_name`, `hr_email`, `industry`, `website`, `phone`, `logo`, `is_closed`, `created_at`) VALUES ('5', 'Infosys Limited', 'Salil Parekh', 'hr.infosys@gmail.com', 'Digital Tech & AI', 'https://www.infosys.com', '+91 98250 55665', 'default_company.png', '0', '2026-10-03 12:17:31');
-INSERT INTO `companies` (`id`, `company_name`, `hr_name`, `hr_email`, `industry`, `website`, `phone`, `logo`, `is_closed`, `created_at`) VALUES ('6', 'Larsen & Toubro (L&T)', 'S. N. Subrahmanyan', 'hr.lt@gmail.com', 'Engineering & Construction', 'https://larsentoubro.com', NULL, 'default_company.png', '0', '2026-10-03 12:17:31');
-INSERT INTO `companies` (`id`, `company_name`, `hr_name`, `hr_email`, `industry`, `website`, `phone`, `logo`, `is_closed`, `created_at`) VALUES ('7', 'Microsoft Corporation', 'Satya Nadella', 'hr.microsoft@gmail.com', 'Enterprise Cloud Software', 'https://careers.microsoft.com', '+91 98250 22332', 'default_company.png', '0', '2026-10-26 19:15:37');
-INSERT INTO `companies` (`id`, `company_name`, `hr_name`, `hr_email`, `industry`, `website`, `phone`, `logo`, `is_closed`, `created_at`) VALUES ('8', 'L&T Technology Services', 'Amit Chadha', 'hr.lt@gmail.com', 'Engineering & IoT', 'https://www.ltts.com', '+91 98250 66776', 'default_company.png', '0', '2026-10-26 19:15:37');
-
-DROP TABLE IF EXISTS `drives`;
-CREATE TABLE `drives` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `company_id` int(11) NOT NULL,
-  `title` varchar(200) NOT NULL,
-  `designation` varchar(150) NOT NULL,
-  `package_ctc` varchar(50) NOT NULL,
-  `location` varchar(100) DEFAULT 'Pan India / Remote',
-  `min_cpi` decimal(4,2) DEFAULT 6.50,
-  `allowed_branches` varchar(255) DEFAULT 'CSE, IT, ECE, MECH, CIVIL',
-  `max_backlogs` int(11) DEFAULT 0,
-  `drive_date` date NOT NULL,
-  `deadline` date NOT NULL,
-  `deadline_time` varchar(20) DEFAULT '18:00',
-  `description` text DEFAULT NULL,
-  `status` enum('Upcoming','Active','Completed','Cancelled') DEFAULT 'Active',
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `allowed_semesters` varchar(100) DEFAULT '5,6,7,8',
-  `package_numeric` decimal(10,2) DEFAULT 0.00,
-  PRIMARY KEY (`id`),
-  KEY `company_id` (`company_id`),
-  CONSTRAINT `drives_ibfk_1` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
-INSERT INTO `drives` (`id`, `company_id`, `title`, `designation`, `package_ctc`, `location`, `min_cpi`, `allowed_branches`, `max_backlogs`, `drive_date`, `deadline`, `deadline_time`, `description`, `status`, `created_at`, `allowed_semesters`, `package_numeric`) VALUES ('1', '1', 'Software Engineer 2026 (SDE-1)', 'Software Engineer', '₹24.50 LPA', 'Pan India / Remote', '8.50', 'CSE, IT, ECE', '0', '2026-11-15', '2026-11-01', '18:00', NULL, 'Active', '2026-10-03 12:17:31', '7,8', '24.50');
-INSERT INTO `drives` (`id`, `company_id`, `title`, `designation`, `package_ctc`, `location`, `min_cpi`, `allowed_branches`, `max_backlogs`, `drive_date`, `deadline`, `deadline_time`, `description`, `status`, `created_at`, `allowed_semesters`, `package_numeric`) VALUES ('2', '2', 'Azure Cloud & AI Developer 2026', 'Cloud Engineer', '₹32.00 LPA', 'Pan India / Remote', '9.00', 'CSE, IT', '0', '2026-11-15', '2026-11-01', '18:00', NULL, 'Active', '2026-10-03 12:17:31', '7,8', '32.00');
-INSERT INTO `drives` (`id`, `company_id`, `title`, `designation`, `package_ctc`, `location`, `min_cpi`, `allowed_branches`, `max_backlogs`, `drive_date`, `deadline`, `deadline_time`, `description`, `status`, `created_at`, `allowed_semesters`, `package_numeric`) VALUES ('3', '3', 'DevOps & Systems Architect', 'DevOps Engineer', '₹18.00 LPA', 'Pan India / Remote', '8.00', 'CSE, IT, ECE', '0', '2026-11-15', '2026-11-01', '18:00', NULL, 'Active', '2026-10-03 12:17:31', '6,7,8', '18.00');
-INSERT INTO `drives` (`id`, `company_id`, `title`, `designation`, `package_ctc`, `location`, `min_cpi`, `allowed_branches`, `max_backlogs`, `drive_date`, `deadline`, `deadline_time`, `description`, `status`, `created_at`, `allowed_semesters`, `package_numeric`) VALUES ('4', '4', 'TCS Digital & Prime Engineer', 'Digital Engineer', '₹9.00 LPA', 'Pan India / Remote', '7.00', 'CSE, IT, ECE, MECH, CIVIL', '0', '2026-11-15', '2026-11-01', '18:00', NULL, 'Active', '2026-10-03 12:17:31', '5,6,7,8', '9.00');
-INSERT INTO `drives` (`id`, `company_id`, `title`, `designation`, `package_ctc`, `location`, `min_cpi`, `allowed_branches`, `max_backlogs`, `drive_date`, `deadline`, `deadline_time`, `description`, `status`, `created_at`, `allowed_semesters`, `package_numeric`) VALUES ('5', '5', 'Specialist Programmer & Systems Engineer', 'System Associate', '₹9.50 LPA', 'Pan India / Remote', '7.50', 'CSE, IT, ECE', '0', '2026-11-15', '2026-11-01', '18:00', NULL, 'Active', '2026-10-03 12:17:31', '6,7,8', '9.50');
-INSERT INTO `drives` (`id`, `company_id`, `title`, `designation`, `package_ctc`, `location`, `min_cpi`, `allowed_branches`, `max_backlogs`, `drive_date`, `deadline`, `deadline_time`, `description`, `status`, `created_at`, `allowed_semesters`, `package_numeric`) VALUES ('6', '6', 'Graduate Engineer Trainee 2026', 'GET Mechanical/Civil', '₹7.50 LPA', 'Pan India / Remote', '6.50', 'MECH, CIVIL', '0', '2026-11-15', '2026-11-01', '18:00', NULL, 'Active', '2026-10-03 12:17:31', '7,8', '7.50');
-INSERT INTO `drives` (`id`, `company_id`, `title`, `designation`, `package_ctc`, `location`, `min_cpi`, `allowed_branches`, `max_backlogs`, `drive_date`, `deadline`, `deadline_time`, `description`, `status`, `created_at`, `allowed_semesters`, `package_numeric`) VALUES ('7', '1', 'Software Development Engineer (SWE-1)', 'Software Engineer - Distributed Systems', '₹24.50 LPA', 'Bengaluru / Hyderabad', '8.00', 'CSE, IT, ECE', '0', '2026-11-15', '2026-11-10', '18:00', NULL, 'Completed', '2026-10-26 19:15:37', '5,6,7,8', '24.50');
-INSERT INTO `drives` (`id`, `company_id`, `title`, `designation`, `package_ctc`, `location`, `min_cpi`, `allowed_branches`, `max_backlogs`, `drive_date`, `deadline`, `deadline_time`, `description`, `status`, `created_at`, `allowed_semesters`, `package_numeric`) VALUES ('8', '7', 'Azure Cloud & AI Solutions Engineer', 'Cloud Solutions Associate', '₹44.00 LPA', 'Noida / Hyderabad', '8.50', 'CSE, IT', '0', '2026-11-15', '2026-11-10', '18:00', NULL, 'Active', '2026-10-26 19:15:37', '5,6,7,8', '44.00');
-INSERT INTO `drives` (`id`, `company_id`, `title`, `designation`, `package_ctc`, `location`, `min_cpi`, `allowed_branches`, `max_backlogs`, `drive_date`, `deadline`, `deadline_time`, `description`, `status`, `created_at`, `allowed_semesters`, `package_numeric`) VALUES ('9', '3', 'Cloud Support Associate & DevOps Engineer', 'DevOps Specialist', '₹18.00 LPA', 'Bengaluru / Pune', '7.50', 'CSE, IT, ECE', '0', '2026-11-15', '2026-11-10', '18:00', NULL, 'Active', '2026-10-26 19:15:37', '5,6,7,8', '18.00');
-INSERT INTO `drives` (`id`, `company_id`, `title`, `designation`, `package_ctc`, `location`, `min_cpi`, `allowed_branches`, `max_backlogs`, `drive_date`, `deadline`, `deadline_time`, `description`, `status`, `created_at`, `allowed_semesters`, `package_numeric`) VALUES ('10', '4', 'TCS Digital & Ninja Developer', 'Systems Engineer', '₹9.00 LPA', 'Ahmedabad / Gandhinagar', '6.50', 'CSE, IT, ECE, MECH, CIVIL', '0', '2026-11-15', '2026-11-10', '18:00', NULL, 'Active', '2026-10-26 19:15:37', '5,6,7,8', '9.00');
-INSERT INTO `drives` (`id`, `company_id`, `title`, `designation`, `package_ctc`, `location`, `min_cpi`, `allowed_branches`, `max_backlogs`, `drive_date`, `deadline`, `deadline_time`, `description`, `status`, `created_at`, `allowed_semesters`, `package_numeric`) VALUES ('11', '5', 'Power Programmer & Specialist Engineer', 'Associate Consultant', '₹9.50 LPA', 'Pune / Mysuru', '7.00', 'CSE, IT, ECE', '0', '2026-11-15', '2026-11-10', '18:00', NULL, 'Active', '2026-10-26 19:15:37', '5,6,7,8', '9.50');
-INSERT INTO `drives` (`id`, `company_id`, `title`, `designation`, `package_ctc`, `location`, `min_cpi`, `allowed_branches`, `max_backlogs`, `drive_date`, `deadline`, `deadline_time`, `description`, `status`, `created_at`, `allowed_semesters`, `package_numeric`) VALUES ('12', '8', 'Graduate Engineer Trainee (GET)', 'GET - Embedded & Design', '₹8.50 LPA', 'Vadodara / Mumbai', '6.50', 'ECE, MECH, CIVIL', '0', '2026-11-15', '2026-11-10', '18:00', NULL, 'Active', '2026-10-26 19:15:37', '5,6,7,8', '8.50');
 
 DROP TABLE IF EXISTS `users`;
 CREATE TABLE `users` (
@@ -223,6 +146,68 @@ INSERT INTO `students` (`id`, `user_id`, `enrollment_no`, `full_name`, `email`, 
 INSERT INTO `students` (`id`, `user_id`, `enrollment_no`, `full_name`, `email`, `phone`, `gender`, `branch`, `cpi`, `backlogs`, `batch_year`, `resume_file`, `profile_photo`, `placement_status`, `is_detained`, `created_at`, `current_semester`, `linkedin_url`, `offer_letter`, `placed_companies`, `current_package_lpa`) VALUES ('29', '65', '240130316049', 'Urvashi Vala', 'urvashi.2024@drsubhash.edu.in', '+91 98253 03049', 'Female', 'ECE', '7.90', '0', '2024', 'default_resume.pdf', 'default_avatar.png', 'Placed', '0', '2026-10-26 19:15:37', '8', 'https://www.linkedin.com/in/urvashi-vala', 'offer_letter_260130316001.pdf', 'Tata Consultancy Services (TCS) (₹9.00 LPA)', NULL);
 INSERT INTO `students` (`id`, `user_id`, `enrollment_no`, `full_name`, `email`, `phone`, `gender`, `branch`, `cpi`, `backlogs`, `batch_year`, `resume_file`, `profile_photo`, `placement_status`, `is_detained`, `created_at`, `current_semester`, `linkedin_url`, `offer_letter`, `placed_companies`, `current_package_lpa`) VALUES ('30', '67', '240130316050', 'Manav Sutariya', 'manav.2024@drsubhash.edu.in', '+91 98253 03050', 'Male', 'IT', '7.10', '0', '2024', 'default_resume.pdf', 'default_avatar.png', 'Unplaced', '0', '2026-10-26 19:15:37', '8', 'https://www.linkedin.com/in/manav-sutariya', NULL, NULL, NULL);
 
+DROP TABLE IF EXISTS `companies`;
+CREATE TABLE `companies` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `company_name` varchar(150) NOT NULL,
+  `hr_name` varchar(100) DEFAULT NULL,
+  `hr_email` varchar(100) DEFAULT NULL,
+  `industry` varchar(100) DEFAULT 'IT & Software',
+  `website` varchar(150) DEFAULT NULL,
+  `phone` varchar(20) DEFAULT NULL,
+  `logo` varchar(255) DEFAULT 'default_company.png',
+  `is_closed` tinyint(1) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `company_name` (`company_name`)
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+INSERT INTO `companies` (`id`, `company_name`, `hr_name`, `hr_email`, `industry`, `website`, `phone`, `logo`, `is_closed`, `created_at`) VALUES ('1', 'Google India Pvt Ltd', 'Sundeep Pichai', 'hr.google@gmail.com', 'Cloud & AI Systems', 'https://careers.google.com', '+91 98250 11221', 'default_company.png', '0', '2026-10-03 12:17:31');
+INSERT INTO `companies` (`id`, `company_name`, `hr_name`, `hr_email`, `industry`, `website`, `phone`, `logo`, `is_closed`, `created_at`) VALUES ('2', 'Microsoft India', 'Satya Nadella', 'hr.microsoft@gmail.com', 'Enterprise Cloud & OS', 'https://careers.microsoft.com', NULL, 'default_company.png', '0', '2026-10-03 12:17:31');
+INSERT INTO `companies` (`id`, `company_name`, `hr_name`, `hr_email`, `industry`, `website`, `phone`, `logo`, `is_closed`, `created_at`) VALUES ('3', 'Amazon Web Services (AWS)', 'Andrew Jassy', 'hr.aws@gmail.com', 'Cloud Computing & DevOps', 'https://aws.amazon.com', '+91 98250 33443', 'default_company.png', '0', '2026-10-03 12:17:31');
+INSERT INTO `companies` (`id`, `company_name`, `hr_name`, `hr_email`, `industry`, `website`, `phone`, `logo`, `is_closed`, `created_at`) VALUES ('4', 'Tata Consultancy Services (TCS)', 'K. Krithivasan', 'hr.tcs@gmail.com', 'IT Services & Consulting', 'https://www.tcs.com', '+91 98250 44554', 'default_company.png', '0', '2026-10-03 12:17:31');
+INSERT INTO `companies` (`id`, `company_name`, `hr_name`, `hr_email`, `industry`, `website`, `phone`, `logo`, `is_closed`, `created_at`) VALUES ('5', 'Infosys Limited', 'Salil Parekh', 'hr.infosys@gmail.com', 'Digital Tech & AI', 'https://www.infosys.com', '+91 98250 55665', 'default_company.png', '0', '2026-10-03 12:17:31');
+INSERT INTO `companies` (`id`, `company_name`, `hr_name`, `hr_email`, `industry`, `website`, `phone`, `logo`, `is_closed`, `created_at`) VALUES ('6', 'Larsen & Toubro (L&T)', 'S. N. Subrahmanyan', 'hr.lt@gmail.com', 'Engineering & Construction', 'https://larsentoubro.com', NULL, 'default_company.png', '0', '2026-10-03 12:17:31');
+INSERT INTO `companies` (`id`, `company_name`, `hr_name`, `hr_email`, `industry`, `website`, `phone`, `logo`, `is_closed`, `created_at`) VALUES ('7', 'Microsoft Corporation', 'Satya Nadella', 'hr.microsoft@gmail.com', 'Enterprise Cloud Software', 'https://careers.microsoft.com', '+91 98250 22332', 'default_company.png', '0', '2026-10-26 19:15:37');
+INSERT INTO `companies` (`id`, `company_name`, `hr_name`, `hr_email`, `industry`, `website`, `phone`, `logo`, `is_closed`, `created_at`) VALUES ('8', 'L&T Technology Services', 'Amit Chadha', 'hr.lt@gmail.com', 'Engineering & IoT', 'https://www.ltts.com', '+91 98250 66776', 'default_company.png', '0', '2026-10-26 19:15:37');
+
+DROP TABLE IF EXISTS `drives`;
+CREATE TABLE `drives` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `company_id` int(11) NOT NULL,
+  `title` varchar(200) NOT NULL,
+  `designation` varchar(150) NOT NULL,
+  `package_ctc` varchar(50) NOT NULL,
+  `location` varchar(100) DEFAULT 'Pan India / Remote',
+  `min_cpi` decimal(4,2) DEFAULT 6.50,
+  `allowed_branches` varchar(255) DEFAULT 'CSE, IT, ECE, MECH, CIVIL',
+  `max_backlogs` int(11) DEFAULT 0,
+  `drive_date` date NOT NULL,
+  `deadline` date NOT NULL,
+  `deadline_time` varchar(20) DEFAULT '18:00',
+  `description` text DEFAULT NULL,
+  `status` enum('Upcoming','Active','Completed','Cancelled') DEFAULT 'Active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `allowed_semesters` varchar(100) DEFAULT '5,6,7,8',
+  `package_numeric` decimal(10,2) DEFAULT 0.00,
+  PRIMARY KEY (`id`),
+  KEY `company_id` (`company_id`),
+  CONSTRAINT `drives_ibfk_1` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+INSERT INTO `drives` (`id`, `company_id`, `title`, `designation`, `package_ctc`, `location`, `min_cpi`, `allowed_branches`, `max_backlogs`, `drive_date`, `deadline`, `deadline_time`, `description`, `status`, `created_at`, `allowed_semesters`, `package_numeric`) VALUES ('1', '1', 'Software Engineer 2026 (SDE-1)', 'Software Engineer', '₹24.50 LPA', 'Pan India / Remote', '8.50', 'CSE, IT, ECE', '0', '2026-11-15', '2026-11-01', '18:00', NULL, 'Active', '2026-10-03 12:17:31', '7,8', '24.50');
+INSERT INTO `drives` (`id`, `company_id`, `title`, `designation`, `package_ctc`, `location`, `min_cpi`, `allowed_branches`, `max_backlogs`, `drive_date`, `deadline`, `deadline_time`, `description`, `status`, `created_at`, `allowed_semesters`, `package_numeric`) VALUES ('2', '2', 'Azure Cloud & AI Developer 2026', 'Cloud Engineer', '₹32.00 LPA', 'Pan India / Remote', '9.00', 'CSE, IT', '0', '2026-11-15', '2026-11-01', '18:00', NULL, 'Active', '2026-10-03 12:17:31', '7,8', '32.00');
+INSERT INTO `drives` (`id`, `company_id`, `title`, `designation`, `package_ctc`, `location`, `min_cpi`, `allowed_branches`, `max_backlogs`, `drive_date`, `deadline`, `deadline_time`, `description`, `status`, `created_at`, `allowed_semesters`, `package_numeric`) VALUES ('3', '3', 'DevOps & Systems Architect', 'DevOps Engineer', '₹18.00 LPA', 'Pan India / Remote', '8.00', 'CSE, IT, ECE', '0', '2026-11-15', '2026-11-01', '18:00', NULL, 'Active', '2026-10-03 12:17:31', '6,7,8', '18.00');
+INSERT INTO `drives` (`id`, `company_id`, `title`, `designation`, `package_ctc`, `location`, `min_cpi`, `allowed_branches`, `max_backlogs`, `drive_date`, `deadline`, `deadline_time`, `description`, `status`, `created_at`, `allowed_semesters`, `package_numeric`) VALUES ('4', '4', 'TCS Digital & Prime Engineer', 'Digital Engineer', '₹9.00 LPA', 'Pan India / Remote', '7.00', 'CSE, IT, ECE, MECH, CIVIL', '0', '2026-11-15', '2026-11-01', '18:00', NULL, 'Active', '2026-10-03 12:17:31', '5,6,7,8', '9.00');
+INSERT INTO `drives` (`id`, `company_id`, `title`, `designation`, `package_ctc`, `location`, `min_cpi`, `allowed_branches`, `max_backlogs`, `drive_date`, `deadline`, `deadline_time`, `description`, `status`, `created_at`, `allowed_semesters`, `package_numeric`) VALUES ('5', '5', 'Specialist Programmer & Systems Engineer', 'System Associate', '₹9.50 LPA', 'Pan India / Remote', '7.50', 'CSE, IT, ECE', '0', '2026-11-15', '2026-11-01', '18:00', NULL, 'Active', '2026-10-03 12:17:31', '6,7,8', '9.50');
+INSERT INTO `drives` (`id`, `company_id`, `title`, `designation`, `package_ctc`, `location`, `min_cpi`, `allowed_branches`, `max_backlogs`, `drive_date`, `deadline`, `deadline_time`, `description`, `status`, `created_at`, `allowed_semesters`, `package_numeric`) VALUES ('6', '6', 'Graduate Engineer Trainee 2026', 'GET Mechanical/Civil', '₹7.50 LPA', 'Pan India / Remote', '6.50', 'MECH, CIVIL', '0', '2026-11-15', '2026-11-01', '18:00', NULL, 'Active', '2026-10-03 12:17:31', '7,8', '7.50');
+INSERT INTO `drives` (`id`, `company_id`, `title`, `designation`, `package_ctc`, `location`, `min_cpi`, `allowed_branches`, `max_backlogs`, `drive_date`, `deadline`, `deadline_time`, `description`, `status`, `created_at`, `allowed_semesters`, `package_numeric`) VALUES ('7', '1', 'Software Development Engineer (SWE-1)', 'Software Engineer - Distributed Systems', '₹24.50 LPA', 'Bengaluru / Hyderabad', '8.00', 'CSE, IT, ECE', '0', '2026-11-15', '2026-11-10', '18:00', NULL, 'Completed', '2026-10-26 19:15:37', '5,6,7,8', '24.50');
+INSERT INTO `drives` (`id`, `company_id`, `title`, `designation`, `package_ctc`, `location`, `min_cpi`, `allowed_branches`, `max_backlogs`, `drive_date`, `deadline`, `deadline_time`, `description`, `status`, `created_at`, `allowed_semesters`, `package_numeric`) VALUES ('8', '7', 'Azure Cloud & AI Solutions Engineer', 'Cloud Solutions Associate', '₹44.00 LPA', 'Noida / Hyderabad', '8.50', 'CSE, IT', '0', '2026-11-15', '2026-11-10', '18:00', NULL, 'Active', '2026-10-26 19:15:37', '5,6,7,8', '44.00');
+INSERT INTO `drives` (`id`, `company_id`, `title`, `designation`, `package_ctc`, `location`, `min_cpi`, `allowed_branches`, `max_backlogs`, `drive_date`, `deadline`, `deadline_time`, `description`, `status`, `created_at`, `allowed_semesters`, `package_numeric`) VALUES ('9', '3', 'Cloud Support Associate & DevOps Engineer', 'DevOps Specialist', '₹18.00 LPA', 'Bengaluru / Pune', '7.50', 'CSE, IT, ECE', '0', '2026-11-15', '2026-11-10', '18:00', NULL, 'Active', '2026-10-26 19:15:37', '5,6,7,8', '18.00');
+INSERT INTO `drives` (`id`, `company_id`, `title`, `designation`, `package_ctc`, `location`, `min_cpi`, `allowed_branches`, `max_backlogs`, `drive_date`, `deadline`, `deadline_time`, `description`, `status`, `created_at`, `allowed_semesters`, `package_numeric`) VALUES ('10', '4', 'TCS Digital & Ninja Developer', 'Systems Engineer', '₹9.00 LPA', 'Ahmedabad / Gandhinagar', '6.50', 'CSE, IT, ECE, MECH, CIVIL', '0', '2026-11-15', '2026-11-10', '18:00', NULL, 'Active', '2026-10-26 19:15:37', '5,6,7,8', '9.00');
+INSERT INTO `drives` (`id`, `company_id`, `title`, `designation`, `package_ctc`, `location`, `min_cpi`, `allowed_branches`, `max_backlogs`, `drive_date`, `deadline`, `deadline_time`, `description`, `status`, `created_at`, `allowed_semesters`, `package_numeric`) VALUES ('11', '5', 'Power Programmer & Specialist Engineer', 'Associate Consultant', '₹9.50 LPA', 'Pune / Mysuru', '7.00', 'CSE, IT, ECE', '0', '2026-11-15', '2026-11-10', '18:00', NULL, 'Active', '2026-10-26 19:15:37', '5,6,7,8', '9.50');
+INSERT INTO `drives` (`id`, `company_id`, `title`, `designation`, `package_ctc`, `location`, `min_cpi`, `allowed_branches`, `max_backlogs`, `drive_date`, `deadline`, `deadline_time`, `description`, `status`, `created_at`, `allowed_semesters`, `package_numeric`) VALUES ('12', '8', 'Graduate Engineer Trainee (GET)', 'GET - Embedded & Design', '₹8.50 LPA', 'Vadodara / Mumbai', '6.50', 'ECE, MECH, CIVIL', '0', '2026-11-15', '2026-11-10', '18:00', NULL, 'Active', '2026-10-26 19:15:37', '5,6,7,8', '8.50');
+
 DROP TABLE IF EXISTS `applications`;
 CREATE TABLE `applications` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -362,46 +347,3 @@ CREATE TABLE `workshop_registrations` (
   CONSTRAINT `workshop_registrations_ibfk_2` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-DROP TABLE IF EXISTS `mou_agreements`;
-CREATE TABLE `mou_agreements` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `company_name` varchar(150) NOT NULL,
-  `signing_date` date NOT NULL,
-  `validity_years` int(11) NOT NULL DEFAULT 3,
-  `expiry_date` date NOT NULL,
-  `training_goals` text DEFAULT NULL,
-  `mou_doc_file` varchar(255) DEFAULT 'mou_sample.pdf',
-  `status` enum('Active','Expired','Pending') DEFAULT 'Active',
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
-DROP TABLE IF EXISTS `mous`;
-CREATE TABLE `mous` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `company_name` varchar(150) NOT NULL,
-  `signed_date` date NOT NULL,
-  `expiry_date` date NOT NULL,
-  `scope` text DEFAULT NULL,
-  `status` enum('Active','Expired','Pending') DEFAULT 'Active',
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
-INSERT INTO `mous` (`id`, `company_name`, `signed_date`, `expiry_date`, `scope`, `status`, `created_at`) VALUES ('1', 'Google India Pvt Ltd', '2024-01-15', '2027-01-15', 'Cloud & AI Student Excellence Center and Direct Campus Hiring', 'Active', '2026-10-03 12:17:31');
-INSERT INTO `mous` (`id`, `company_name`, `signed_date`, `expiry_date`, `scope`, `status`, `created_at`) VALUES ('2', 'Microsoft India', '2024-03-01', '2027-03-01', 'Azure Cloud Academy & Software Developer Fellowships', 'Active', '2026-10-03 12:17:31');
-INSERT INTO `mous` (`id`, `company_name`, `signed_date`, `expiry_date`, `scope`, `status`, `created_at`) VALUES ('3', 'Amazon Web Services (AWS)', '2023-08-10', '2026-08-10', 'AWS Cloud Infrastructure Lab Sponsoring', 'Active', '2026-10-03 12:17:31');
-INSERT INTO `mous` (`id`, `company_name`, `signed_date`, `expiry_date`, `scope`, `status`, `created_at`) VALUES ('4', 'Tata Consultancy Services (TCS)', '2025-02-01', '2028-02-01', 'Industry Curriculum Integration & Internship Pool', 'Active', '2026-10-03 12:17:31');
-
-DROP TABLE IF EXISTS `mail_logs`;
-CREATE TABLE `mail_logs` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `recipient` varchar(100) NOT NULL,
-  `subject` varchar(200) NOT NULL,
-  `body` text NOT NULL,
-  `sent_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `status` varchar(20) DEFAULT 'sent',
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
-SET FOREIGN_KEY_CHECKS = 1;

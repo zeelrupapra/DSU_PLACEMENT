@@ -432,33 +432,60 @@ include __DIR__ . '/../includes/header.php';
 <?php if ($msg): ?><div class="badge-status placed" style="margin-bottom: 16px; display: block; font-size: 14px; padding: 12px 20px; border-radius: 12px; font-weight: 800;"><?= htmlspecialchars($msg); ?></div><?php endif; ?>
 <?php if ($error): ?><div class="badge-status unplaced" style="margin-bottom: 16px; display: block; font-size: 14px; padding: 12px 20px; border-radius: 12px; font-weight: 800;"><?= htmlspecialchars($error); ?></div><?php endif; ?>
 
-<!-- Summary KPI Cards Row -->
+<!-- Summary KPI Cards Row (Interactive & Clickable) -->
 <div class="kpi-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 24px;">
-    <div class="kpi-card" style="padding: 16px 20px;">
+    <?php $isAllMng = empty($detainFilter) && $detainFilter !== '0'; ?>
+    <div onclick="window.location.href='manage_students.php?view=<?= htmlspecialchars($viewMode); ?>&branch=<?= urlencode($branchFilter); ?>&year=<?= $yearFilter; ?>&detained='" 
+         class="kpi-card" 
+         style="padding: 18px 22px; cursor: pointer; transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1); <?= $isAllMng ? 'background: linear-gradient(135deg, #FFFFFF 0%, #EFF6FF 100%); border: 2.5px solid #3B82F6; box-shadow: 0 10px 24px -5px rgba(59, 130, 246, 0.25);' : 'background: white; border: 1px solid var(--border-color);'; ?>"
+         onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 14px 28px rgba(59,130,246,0.18)';"
+         onmouseout="this.style.transform='none'; this.style.boxShadow='<?= $isAllMng ? '0 10px 24px -5px rgba(59, 130, 246, 0.25)' : 'none'; ?>';"
+         title="Click to show all registered candidates list">
         <div class="kpi-top">
-            <span class="kpi-title">Total Registered Candidates</span>
-            <div class="kpi-icon blue"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
+            <span class="kpi-title" style="font-weight: 800; color: <?= $isAllMng ? '#1D4ED8' : '#64748B'; ?>;">Total Registered Candidates</span>
+            <div class="kpi-icon blue" style="<?= $isAllMng ? 'background: #3B82F6; color: white;' : ''; ?>"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
         </div>
-        <div class="kpi-value" style="font-size: 24px;"><?= number_format($totalCount); ?></div>
-        <span class="kpi-badge info">Total Enrolled</span>
+        <div class="kpi-value" style="font-size: 26px; font-weight: 900; margin: 4px 0 8px 0;"><?= number_format($totalCount); ?></div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span class="kpi-badge info" style="<?= $isAllMng ? 'background: #3B82F6; color: white;' : ''; ?>"><?= $isAllMng ? '✓ Active: All Registered' : 'Total Enrolled'; ?></span>
+            <span style="font-size: 11px; font-weight: 800; color: #2563EB;"><?= $isAllMng ? 'Showing List ▾' : 'Show All List ↗'; ?></span>
+        </div>
     </div>
 
-    <div class="kpi-card" style="padding: 16px 20px;">
+    <?php $isEligMng = ($detainFilter === '0'); ?>
+    <div onclick="window.location.href='manage_students.php?view=<?= htmlspecialchars($viewMode); ?>&branch=<?= urlencode($branchFilter); ?>&year=<?= $yearFilter; ?>&detained=0'" 
+         class="kpi-card" 
+         style="padding: 18px 22px; cursor: pointer; transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1); <?= $isEligMng ? 'background: linear-gradient(135deg, #FFFFFF 0%, #ECFDF5 100%); border: 2.5px solid #10B981; box-shadow: 0 10px 24px -5px rgba(16, 185, 129, 0.25);' : 'background: white; border: 1px solid var(--border-color);'; ?>"
+         onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 14px 28px rgba(16,185,129,0.18)';"
+         onmouseout="this.style.transform='none'; this.style.boxShadow='<?= $isEligMng ? '0 10px 24px -5px rgba(16, 185, 129, 0.25)' : 'none'; ?>';"
+         title="Click to show eligible candidates list">
         <div class="kpi-top">
-            <span class="kpi-title">Eligible Candidates</span>
-            <div class="kpi-icon green"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <span class="kpi-title" style="font-weight: 800; color: <?= $isEligMng ? '#047857' : '#64748B'; ?>;">Eligible Candidates</span>
+            <div class="kpi-icon green" style="<?= $isEligMng ? 'background: #10B981; color: white;' : ''; ?>"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div>
         </div>
-        <div class="kpi-value" style="font-size: 24px; color: #10B981;"><?= number_format($eligibleCount); ?></div>
-        <span class="kpi-badge up">🟢 Active for Drives</span>
+        <div class="kpi-value" style="font-size: 26px; font-weight: 900; color: #10B981; margin: 4px 0 8px 0;"><?= number_format($eligibleCount); ?></div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span class="kpi-badge up" style="<?= $isEligMng ? 'background: #10B981; color: white;' : ''; ?>"><?= $isEligMng ? '✓ Active: Eligible' : '🟢 Active for Drives'; ?></span>
+            <span style="font-size: 11px; font-weight: 800; color: #059669;"><?= $isEligMng ? 'Showing List ▾' : 'Show Eligible List ↗'; ?></span>
+        </div>
     </div>
 
-    <div class="kpi-card" style="padding: 16px 20px;">
+    <?php $isDetMng = ($detainFilter === '1'); ?>
+    <div onclick="window.location.href='manage_students.php?view=<?= htmlspecialchars($viewMode); ?>&branch=<?= urlencode($branchFilter); ?>&year=<?= $yearFilter; ?>&detained=1'" 
+         class="kpi-card" 
+         style="padding: 18px 22px; cursor: pointer; transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1); <?= $isDetMng ? 'background: linear-gradient(135deg, #FFFFFF 0%, #FEF2F2 100%); border: 2.5px solid #EF4444; box-shadow: 0 10px 24px -5px rgba(239, 68, 68, 0.25);' : 'background: white; border: 1px solid var(--border-color);'; ?>"
+         onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 14px 28px rgba(239,68,68,0.18)';"
+         onmouseout="this.style.transform='none'; this.style.boxShadow='<?= $isDetMng ? '0 10px 24px -5px rgba(239, 68, 68, 0.25)' : 'none'; ?>';"
+         title="Click to show detained candidates list">
         <div class="kpi-top">
-            <span class="kpi-title">Detained Candidates</span>
-            <div class="kpi-icon cyan"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+            <span class="kpi-title" style="font-weight: 800; color: <?= $isDetMng ? '#B91C1C' : '#64748B'; ?>;">Detained Candidates</span>
+            <div class="kpi-icon cyan" style="<?= $isDetMng ? 'background: #EF4444; color: white;' : ''; ?>"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
         </div>
-        <div class="kpi-value" style="font-size: 24px; color: #EF4444;"><?= number_format($detainedCount); ?></div>
-        <span class="kpi-badge" style="background:#FEE2E2; color:#B91C1C;">⛔ Blocked / Detained</span>
+        <div class="kpi-value" style="font-size: 26px; font-weight: 900; color: #EF4444; margin: 4px 0 8px 0;"><?= number_format($detainedCount); ?></div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span class="kpi-badge" style="background:#FEE2E2; color:#B91C1C; <?= $isDetMng ? 'background: #EF4444; color: white;' : ''; ?>"><?= $isDetMng ? '✓ Active: Detained' : '⛔ Blocked / Detained'; ?></span>
+            <span style="font-size: 11px; font-weight: 800; color: #DC2626;"><?= $isDetMng ? 'Showing List ▾' : 'Show Detained List ↗'; ?></span>
+        </div>
     </div>
 </div>
 
