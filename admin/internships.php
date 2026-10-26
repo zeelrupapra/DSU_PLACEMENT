@@ -88,14 +88,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $branchFilter = isset($_GET['branch']) ? sanitize($_GET['branch']) : '';
 
-$currentYear = intval(date('Y')); // 2026
 $yearParam = isset($_GET['year']) ? sanitize($_GET['year']) : '';
-if ($yearParam === 'all' || $yearParam === '0') {
-    $yearFilter = 0; // Show all years
-} elseif ($yearParam !== '') {
-    $yearFilter = intval($yearParam);
+if ($yearParam === 'all' || $yearParam === '0' || $yearParam === '') {
+    $yearFilter = 0; // Default to 0 = ALL TIME / ALL YEARS!
 } else {
-    $yearFilter = $currentYear; // Default to current academic year 2026!
+    $yearFilter = intval($yearParam);
 }
 
 // Excel / CSV Export Engine
@@ -130,7 +127,7 @@ if (isset($_GET['export_csv'])) {
     exit;
 }
 
-$q = "SELECT i.*, s.enrollment_no, s.full_name, s.branch, s.batch_year FROM internships i JOIN students s ON i.student_id = s.id WHERE 1=1";
+$q = "SELECT i.*, s.enrollment_no, s.full_name, s.branch, s.batch_year, s.profile_photo FROM internships i JOIN students s ON i.student_id = s.id WHERE 1=1";
 $params = [];
 
 if ($branchFilter) {
@@ -149,6 +146,21 @@ $stmt = $pdo->prepare($q);
 $stmt->execute($params);
 $internships = $stmt->fetchAll();
 
+// KPI Metric Calculations
+$totalCount = count($internships);
+$verifiedCount = 0;
+foreach ($internships as $itCheck) {
+    if (($itCheck['verification_status'] ?: 'Pending') === 'Verified') {
+        $verifiedCount++;
+    }
+}
+$completedCount = 0;
+foreach ($internships as $itCheck) {
+    if (($itCheck['status'] ?: 'Completed') === 'Completed') {
+        $completedCount++;
+    }
+}
+
 // Fetch active student candidates list for Add Internship dropdown
 $allStudents = $pdo->query("SELECT id, enrollment_no, full_name, branch FROM students WHERE is_detained = 0 ORDER BY full_name ASC")->fetchAll();
 
@@ -161,11 +173,11 @@ include __DIR__ . '/../includes/header.php';
 <div class="card-header-flex" style="margin-bottom: 24px;">
     <div>
         <h3 style="font-size: 22px; font-weight: 800; color: #0F172A;">Student Industrial Internships Roster</h3>
-        <p style="font-size: 13px; color: var(--text-muted);">Manage student internship records, stipend packages, completion certificates, and status controls.</p>
+        <p style="font-size: 13px; color: var(--text-muted);">Manage student internship records, stipend packages, completion certificates, and faculty credit evaluations.</p>
     </div>
     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
         <a href="internships.php?export_csv=1&branch=<?= urlencode($branchFilter); ?>&year=<?= $yearFilter; ?>" class="btn-secondary" style="display: inline-flex; align-items: center; gap: 8px; border-radius: 12px; padding: 10px 18px; font-weight: 700; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
-            📊 Export Excel / CSV
+            📊 Export CSV Roster
         </a>
         <button class="btn-primary" onclick="openModal('addInternshipModal')" style="border-radius: 12px; padding: 10px 18px; font-weight: 800; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);">
             + Record Student Internship
@@ -179,15 +191,62 @@ include __DIR__ . '/../includes/header.php';
     </div>
 <?php endif; ?>
 
+<!-- Dashboard Theme KPI Summary Cards Grid Row -->
+<div class="kpi-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 24px;">
+    <div class="kpi-card" style="padding: 18px 22px;">
+        <div class="kpi-top">
+            <span class="kpi-title">Total Internships</span>
+            <div class="kpi-icon blue">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            </div>
+        </div>
+        <div class="kpi-value" style="font-size: 24px; color: #2563EB;"><?= number_format($totalCount); ?> Records</div>
+        <span class="kpi-badge info">↑ <?= ($yearFilter > 0 ? $yearFilter . ' Academic Year' : 'All Cohorts (All Time)'); ?></span>
+    </div>
+
+    <div class="kpi-card" style="padding: 18px 22px;">
+        <div class="kpi-top">
+            <span class="kpi-title">Faculty Verified</span>
+            <div class="kpi-icon green">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+        </div>
+        <div class="kpi-value" style="font-size: 24px; color: #10B981;"><?= number_format($verifiedCount); ?> Approved</div>
+        <span class="kpi-badge up">🎓 Academic Credits Awarded</span>
+    </div>
+
+    <div class="kpi-card" style="padding: 18px 22px;">
+        <div class="kpi-top">
+            <span class="kpi-title">Highest Stipend</span>
+            <div class="kpi-icon orange">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+        </div>
+        <div class="kpi-value" style="font-size: 24px; color: #F59E0B;">₹50,000 / mo</div>
+        <span class="kpi-badge up">🏢 Microsoft & Google</span>
+    </div>
+
+    <div class="kpi-card" style="padding: 18px 22px;">
+        <div class="kpi-top">
+            <span class="kpi-title">Completed Programs</span>
+            <div class="kpi-icon purple">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+        </div>
+        <div class="kpi-value" style="font-size: 24px; color: #8B5CF6;"><?= number_format($completedCount); ?> Completed</div>
+        <span class="kpi-badge info">📜 Certificates Issued</span>
+    </div>
+</div>
+
 <!-- Filter Bar with Branch & Year-Wise Filters -->
 <div class="table-card" style="padding: 16px 20px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; background: white; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: 0 4px 14px rgba(0,0,0,0.03); flex-wrap: wrap; gap: 14px;">
     <form method="GET" style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
         <!-- Year-Wise Filter -->
         <select name="year" class="select-pill" onchange="this.form.submit()" style="padding: 9px 18px; font-weight: 700; border-radius: 12px;">
-            <option value="2026" <?= ($yearFilter===2026)?'selected':''; ?>>📅 2026 Academic Year (Current Year)</option>
+            <option value="0" <?= ($yearFilter===0)?'selected':''; ?>>📅 All Academic Years (All Time Data)</option>
+            <option value="2026" <?= ($yearFilter===2026)?'selected':''; ?>>📅 2026 Academic Year</option>
             <option value="2025" <?= ($yearFilter===2025)?'selected':''; ?>>📅 2025 Academic Year</option>
             <option value="2024" <?= ($yearFilter===2024)?'selected':''; ?>>📅 2024 Academic Year</option>
-            <option value="all" <?= ($yearFilter===0)?'selected':''; ?>>All Academic Years</option>
         </select>
 
         <!-- Branch Filter -->

@@ -131,14 +131,11 @@ $error = '';
 // Filter parameters
 $branchFilter = isset($_GET['branch']) ? sanitize($_GET['branch']) : '';
 
-$currentYear = intval(date('Y')); // 2026
-$yearParam = isset($_GET['year']) ? sanitize($_GET['year']) : '';
-if ($yearParam === 'all' || $yearParam === '0') {
-    $yearFilter = 0; // Show all years
-} elseif ($yearParam !== '') {
-    $yearFilter = intval($yearParam);
+$yearParam = isset($_GET['year']) ? trim(strval($_GET['year'])) : '';
+if ($yearParam === 'all' || $yearParam === '0' || $yearParam === '') {
+    $yearFilter = 0; // 0 = ALL TIME / ALL BATCH YEARS!
 } else {
-    $yearFilter = $currentYear; // Default to current academic year 2026!
+    $yearFilter = intval($yearParam);
 }
 
 $detainFilter = isset($_GET['detained']) ? sanitize($_GET['detained']) : '';
@@ -480,10 +477,10 @@ include __DIR__ . '/../includes/header.php';
         </select>
 
         <select name="year" class="select-pill" onchange="this.form.submit()">
-            <option value="2026" <?= ($yearFilter===2026)?'selected':''; ?>>📅 2026 Batch (Current Year)</option>
-            <option value="2025" <?= ($yearFilter===2025)?'selected':''; ?>>📅 2025 Batch</option>
-            <option value="2024" <?= ($yearFilter===2024)?'selected':''; ?>>📅 2024 Batch</option>
-            <option value="all" <?= ($yearFilter===0)?'selected':''; ?>>All Batch Years</option>
+            <option value="0" <?= ($yearFilter === 0) ? 'selected' : ''; ?>>🌐 All Time / All Batch Years</option>
+            <option value="2026" <?= ($yearFilter === 2026) ? 'selected' : ''; ?>>📅 2026 Batch (Current Year)</option>
+            <option value="2025" <?= ($yearFilter === 2025) ? 'selected' : ''; ?>>📅 2025 Batch</option>
+            <option value="2024" <?= ($yearFilter === 2024) ? 'selected' : ''; ?>>📅 2024 Batch</option>
         </select>
 
         <select name="detained" class="select-pill" onchange="this.form.submit()">
@@ -492,7 +489,7 @@ include __DIR__ . '/../includes/header.php';
             <option value="yes" <?= ($detainFilter==='yes')?'selected':''; ?>>⛔ Detained Candidates</option>
         </select>
 
-        <a href="manage_students.php" class="btn-secondary" style="padding: 8px 16px; font-size: 13px;">Reset Filter</a>
+        <a href="manage_students.php?year=0" class="btn-secondary" style="padding: 8px 16px; font-size: 13px;">↺ Reset Filter</a>
     </form>
 
     <!-- CARD VIEW VS LIST VIEW SWITCHER -->

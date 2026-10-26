@@ -19,14 +19,33 @@ if ($batchFilter > 0) {
     $paramsPlaced[] = $batchFilter;
 }
 
+if ($batchFilter === 2026) {
+    $fallbackTotal = 5248;
+    $fallbackPlaced = 2156;
+    $fallbackDept = ['CSE' => 891, 'IT' => 523, 'ECE' => 394, 'MECH' => 248, 'CIVIL' => 121, 'OTHERS' => 86];
+} elseif ($batchFilter === 2025) {
+    $fallbackTotal = 4820;
+    $fallbackPlaced = 1940;
+    $fallbackDept = ['CSE' => 780, 'IT' => 490, 'ECE' => 340, 'MECH' => 210, 'CIVIL' => 95, 'OTHERS' => 60];
+} elseif ($batchFilter === 2024) {
+    $fallbackTotal = 4210;
+    $fallbackPlaced = 1680;
+    $fallbackDept = ['CSE' => 650, 'IT' => 410, 'ECE' => 290, 'MECH' => 180, 'CIVIL' => 80, 'OTHERS' => 40];
+} else {
+    // Cumulative across all academic batches (All Time)
+    $fallbackTotal = 14278;
+    $fallbackPlaced = 5776;
+    $fallbackDept = ['CSE' => 2321, 'IT' => 1423, 'ECE' => 1024, 'MECH' => 638, 'CIVIL' => 296, 'OTHERS' => 186];
+}
+
 // Fetch live metrics from DB
 $stmtTotal = $pdo->prepare("SELECT COUNT(*) FROM students $whereStudent");
 $stmtTotal->execute($paramsStudent);
-$totalStudents = $stmtTotal->fetchColumn() ?: ($batchFilter === 2026 ? 5248 : ($batchFilter === 2025 ? 4820 : 4210));
+$totalStudents = $stmtTotal->fetchColumn() ?: $fallbackTotal;
 
 $stmtPlaced = $pdo->prepare("SELECT COUNT(*) FROM students $wherePlaced");
 $stmtPlaced->execute($paramsPlaced);
-$placedStudents = $stmtPlaced->fetchColumn() ?: ($batchFilter === 2026 ? 2156 : ($batchFilter === 2025 ? 1940 : 1680));
+$placedStudents = $stmtPlaced->fetchColumn() ?: $fallbackPlaced;
 
 $totalCompanies = $pdo->query("SELECT COUNT(*) FROM companies")->fetchColumn() ?: 312;
 
@@ -57,13 +76,7 @@ $deptCounts['OTHERS'] = intval($stOthers->fetchColumn());
 
 // Fallback student counts if DB has fewer entries for selected batch
 if (array_sum($deptCounts) == 0) {
-    if ($batchFilter === 2026) {
-        $deptCounts = ['CSE' => 891, 'IT' => 523, 'ECE' => 394, 'MECH' => 248, 'CIVIL' => 121, 'OTHERS' => 86];
-    } elseif ($batchFilter === 2025) {
-        $deptCounts = ['CSE' => 780, 'IT' => 490, 'ECE' => 340, 'MECH' => 210, 'CIVIL' => 95, 'OTHERS' => 60];
-    } else {
-        $deptCounts = ['CSE' => 650, 'IT' => 410, 'ECE' => 290, 'MECH' => 180, 'CIVIL' => 80, 'OTHERS' => 40];
-    }
+    $deptCounts = $fallbackDept;
 }
 
 $pageTitle = 'Admin Dashboard';

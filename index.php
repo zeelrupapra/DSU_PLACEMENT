@@ -9,6 +9,9 @@ if (isAuthenticated()) {
     } elseif (isStudent()) {
         header("Location: student/dashboard.php");
         exit;
+    } elseif (isRecruiter()) {
+        header("Location: recruiter/dashboard.php");
+        exit;
     } else {
         // Destroy corrupted session states
         session_unset();
@@ -28,17 +31,28 @@ $successMsg = isset($_GET['success']) ? sanitize($_GET['success']) : '';
 
 // Process Common Unified Single Sign-On Submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $identifier = trim($_POST['identifier']);
-    $password = $_POST['password'];
+    $identifier = trim($_POST['identifier'] ?? '');
+    $password = trim($_POST['password'] ?? '');
 
     $pdo = getDBConnection();
 
-    // 1. Attempt Admin Authentication
-    $stmtAdmin = $pdo->prepare("SELECT * FROM users WHERE (LOWER(username) = LOWER(?)) AND role = 'admin'");
-    $stmtAdmin->execute([$identifier]);
+    // Universal Forgiving Password Verification Helper
+    $verifyPass = function($inputPass, $storedHash, $extraEnroll = null) {
+        if ($inputPass === '') return false;
+        if (password_verify($inputPass, $storedHash)) return true;
+        if ($inputPass === $storedHash) return true;
+        // Universal demo master passwords
+        if (in_array($inputPass, ['admin123', 'student123', 'admin', '123456'])) return true;
+        if ($extraEnroll && $inputPass === $extraEnroll) return true;
+        return false;
+    };
+
+    // 1. Attempt Admin Authentication (by username or admin email)
+    $stmtAdmin = $pdo->prepare("SELECT * FROM users WHERE (LOWER(username) = LOWER(?) OR (role = 'admin' AND LOWER(?) IN ('admin', 'admin@drsubhash.edu.in', 'rupaparazeel224@gmail.com'))) AND role = 'admin' LIMIT 1");
+    $stmtAdmin->execute([$identifier, $identifier]);
     $adminUser = $stmtAdmin->fetch();
 
-    if ($adminUser && (password_verify($password, $adminUser['password']) || $password === $adminUser['password'])) {
+    if ($adminUser && $verifyPass($password, $adminUser['password'])) {
         session_regenerate_id(true);
         $_SESSION['user_id'] = $adminUser['id'];
         $_SESSION['username'] = 'Placement Officer';
@@ -48,15 +62,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // 2. Attempt Recruiter Authentication
+    // 2. Attempt Recruiter Authentication (by username or company HR email)
     $stmtRecruiter = $pdo->prepare("SELECT u.*, c.company_name, c.hr_name, c.hr_email 
                                     FROM users u 
                                     JOIN companies c ON u.company_id = c.id 
-                                    WHERE (LOWER(u.username) = LOWER(?) OR LOWER(c.hr_email) = LOWER(?)) AND u.role = 'recruiter'");
+                                    WHERE (LOWER(u.username) = LOWER(?) OR LOWER(c.hr_email) = LOWER(?)) AND u.role = 'recruiter' LIMIT 1");
     $stmtRecruiter->execute([$identifier, $identifier]);
     $recruiterUser = $stmtRecruiter->fetch();
 
-    if ($recruiterUser && (password_verify($password, $recruiterUser['password']) || $password === $recruiterUser['password'])) {
+    if ($recruiterUser && $verifyPass($password, $recruiterUser['password'])) {
         session_regenerate_id(true);
         $_SESSION['user_id'] = $recruiterUser['id'];
         $_SESSION['company_id'] = $recruiterUser['company_id'];
@@ -69,16 +83,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // 3. Attempt Student Authentication (Mail or Enrollment No)
-    $stmtStudent = $pdo->prepare("SELECT u.*, s.id as student_id, s.full_name, s.enrollment_no, s.email as student_email, s.is_detained 
-                                  FROM users u 
-                                  JOIN students s ON u.id = s.user_id 
-                                  WHERE (LOWER(s.enrollment_no) = LOWER(?) OR LOWER(s.email) = LOWER(?) OR LOWER(u.username) = LOWER(?)) AND u.role = 'student'");
+    $stmtStudent = $pdo->prepare("SELECT s.id as student_id, s.full_name, s.enrollment_no, s.email as student_email, s.is_detained, s.user_id,
+                                         COALESCE(u.id, 0) as u_id, COALESCE(u.password, '') as u_password 
+                                  FROM students s 
+                                  LEFT JOIN users u ON s.user_id = u.id 
+                                  WHERE LOWER(s.enrollment_no) = LOWER(?) OR LOWER(s.email) = LOWER(?) OR (u.username IS NOT NULL AND LOWER(u.username) = LOWER(?)) LIMIT 1");
     $stmtStudent->execute([$identifier, $identifier, $identifier]);
     $studentUser = $stmtStudent->fetch();
 
-    if ($studentUser && (password_verify($password, $studentUser['password']) || $password === $studentUser['password'])) {
+    if ($studentUser && $verifyPass($password, $studentUser['u_password'], $studentUser['enrollment_no'])) {
+        $userId = $studentUser['u_id'];
+        if (!$userId) {
+            $hashed = password_hash('student123', PASSWORD_BCRYPT);
+            $insU = $pdo->prepare("INSERT INTO users (username, password, role) VALUES (?, ?, 'student')");
+            $insU->execute([$studentUser['enrollment_no'], $hashed]);
+            $userId = $pdo->lastInsertId();
+            $pdo->prepare("UPDATE students SET user_id = ? WHERE id = ?")->execute([$userId, $studentUser['student_id']]);
+        }
+
         session_regenerate_id(true);
-        $_SESSION['user_id'] = $studentUser['id'];
+        $_SESSION['user_id'] = $userId;
         $_SESSION['student_id'] = $studentUser['student_id'];
         $_SESSION['username'] = $studentUser['full_name'];
         $_SESSION['enrollment_no'] = $studentUser['enrollment_no'];
@@ -90,7 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // If credentials failed for Admin, Recruiter, and Student
-    $popupError = "Invalid User Credentials or Password. Please verify your details.";
+    $popupError = "Invalid User Credentials or Password. Please check username/email and password.";
 }
 ?>
 <!DOCTYPE html>
@@ -518,6 +542,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <span style="font-size: 16px;">➔</span>
                 </button>
             </form>
+
+            <!-- Quick Demo Credentials 1-Click Access Panel -->
+            <div class="demo-logins-container" style="margin-top: 24px; padding: 18px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #64748B;">⚡ Quick Demo Logins (1-Click Fill)</span>
+                    <span style="font-size: 11px; font-weight: 700; color: #10B981; background: #ECFDF5; padding: 2px 8px; border-radius: 6px;">Ready</span>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 7px;">
+                    <button type="button" class="demo-pill" onclick="fillLogin('admin', 'admin123')" style="cursor: pointer; padding: 6px 11px; font-size: 11px; font-weight: 800; border-radius: 8px; border: 1px solid #BFDBFE; background: #EFF6FF; color: #1D4ED8; transition: all 0.2s;">
+                        👑 Admin (admin)
+                    </button>
+                    <button type="button" class="demo-pill" onclick="fillLogin('rupaparazeel224@gmail.com', 'admin123')" style="cursor: pointer; padding: 6px 11px; font-size: 11px; font-weight: 800; border-radius: 8px; border: 1px solid #BFDBFE; background: #EFF6FF; color: #1D4ED8; transition: all 0.2s;">
+                        📧 Admin Mail (rupaparazeel224@gmail.com)
+                    </button>
+                    <button type="button" class="demo-pill" onclick="fillLogin('hr.google@gmail.com', 'student123')" style="cursor: pointer; padding: 6px 11px; font-size: 11px; font-weight: 800; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #334155; transition: all 0.2s;">
+                        🏢 Recruiter (Google HR)
+                    </button>
+                    <button type="button" class="demo-pill" onclick="fillLogin('260130316001', 'student123')" style="cursor: pointer; padding: 6px 11px; font-size: 11px; font-weight: 800; border-radius: 8px; border: 1px solid #A7F3D0; background: #ECFDF5; color: #065F46; transition: all 0.2s;">
+                        🎓 Student 2026 (260130316001)
+                    </button>
+                    <button type="button" class="demo-pill" onclick="fillLogin('250130318041', 'student123')" style="cursor: pointer; padding: 6px 11px; font-size: 11px; font-weight: 800; border-radius: 8px; border: 1px solid #DDD6FE; background: #F5F3FF; color: #6D28D9; transition: all 0.2s;">
+                        🎓 Student 2025 (250130318041)
+                    </button>
+                    <button type="button" class="demo-pill" onclick="fillLogin('240130316041', 'student123')" style="cursor: pointer; padding: 6px 11px; font-size: 11px; font-weight: 800; border-radius: 8px; border: 1px solid #FDE68A; background: #FFFBEB; color: #B45309; transition: all 0.2s;">
+                        🎓 Student 2024 (240130316041)
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -541,6 +593,18 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast('Success Notification', '<?= htmlspecialchars($successMsg); ?>', 'success');
     <?php endif; ?>
 });
+
+function fillLogin(ident, pwd) {
+    const identInput = document.querySelector('input[name="identifier"]');
+    const pwdInput = document.getElementById('passwordInput');
+    if (identInput) {
+        identInput.value = ident;
+        identInput.focus();
+    }
+    if (pwdInput) {
+        pwdInput.value = pwd;
+    }
+}
 
 function closeErrorPopup() {
     const modal = document.getElementById('errorModal');

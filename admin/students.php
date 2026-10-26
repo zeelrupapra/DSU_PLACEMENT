@@ -448,14 +448,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Filtering parameters
 $branchFilter = isset($_GET['branch']) ? sanitize($_GET['branch']) : '';
 
-$currentYear = intval(date('Y')); // 2026
-$yearParam = isset($_GET['year']) ? sanitize($_GET['year']) : '';
-if ($yearParam === 'all' || $yearParam === '0') {
-    $yearFilter = 0; // Show all years
-} elseif ($yearParam !== '') {
-    $yearFilter = intval($yearParam);
+// Filtering parameters
+$branchFilter = isset($_GET['branch']) ? sanitize($_GET['branch']) : '';
+
+$yearParam = isset($_GET['year']) ? trim(strval($_GET['year'])) : '';
+if ($yearParam === 'all' || $yearParam === '0' || $yearParam === '') {
+    $yearFilter = 0; // Default to 0 = ALL TIME / ALL BATCH YEARS!
 } else {
-    $yearFilter = $currentYear; // Default to current academic year 2026!
+    $yearFilter = intval($yearParam);
 }
 
 $statusFilter = isset($_GET['status']) ? sanitize($_GET['status']) : '';
@@ -474,7 +474,7 @@ $query = "SELECT s.*,
 $params = [];
 
 if ($branchFilter) { $query .= " AND s.branch = ?"; $params[] = $branchFilter; }
-if ($yearFilter) { $query .= " AND s.batch_year = ?"; $params[] = $yearFilter; }
+if ($yearFilter > 0) { $query .= " AND s.batch_year = ?"; $params[] = $yearFilter; }
 if ($statusFilter) { 
     $query .= " AND s.placement_status = ?"; 
     $params[] = $statusFilter; 
@@ -523,21 +523,50 @@ $stmt = $pdo->prepare($query);
 $stmt->execute($params);
 $students = $stmt->fetchAll();
 
-// Summary Counts for Active Eligible Candidates
-$totalCount = $pdo->query("SELECT COUNT(*) FROM students WHERE is_detained = 0")->fetchColumn() ?: 0;
-$placedCount = $pdo->query("SELECT COUNT(DISTINCT id) FROM students WHERE placement_status = 'Placed' AND is_detained = 0")->fetchColumn() ?: 0;
-$inProcessCount = $pdo->query("SELECT COUNT(*) FROM students WHERE placement_status = 'In-Process' AND is_detained = 0")->fetchColumn() ?: 0;
-$unplacedCount = $pdo->query("SELECT COUNT(*) FROM students WHERE placement_status = 'Unplaced' AND is_detained = 0")->fetchColumn() ?: 0;
+// Dynamic KPI Metrics according to Active Filter
+$whereKpi = "WHERE is_detained = 0";
+$kpiParams = [];
+if ($yearFilter > 0) {
+    $whereKpi .= " AND batch_year = ?";
+    $kpiParams[] = $yearFilter;
+}
+if ($branchFilter) {
+    $whereKpi .= " AND branch = ?";
+    $kpiParams[] = $branchFilter;
+}
+
+$stmtTot = $pdo->prepare("SELECT COUNT(*) FROM students $whereKpi");
+$stmtTot->execute($kpiParams);
+$totalCount = $stmtTot->fetchColumn() ?: 0;
+
+$stmtPlc = $pdo->prepare("SELECT COUNT(*) FROM students $whereKpi AND placement_status = 'Placed'");
+$stmtPlc->execute($kpiParams);
+$placedCount = $stmtPlc->fetchColumn() ?: 0;
+
+$stmtInp = $pdo->prepare("SELECT COUNT(*) FROM students $whereKpi AND placement_status = 'In-Process'");
+$stmtInp->execute($kpiParams);
+$inProcessCount = $stmtInp->fetchColumn() ?: 0;
+
+$stmtUnp = $pdo->prepare("SELECT COUNT(*) FROM students $whereKpi AND placement_status = 'Unplaced'");
+$stmtUnp->execute($kpiParams);
+$unplacedCount = $stmtUnp->fetchColumn() ?: 0;
+
+$placementRate = $totalCount > 0 ? round(($placedCount / $totalCount) * 100, 1) : 0;
 
 $pageTitle = 'Placement Details & Status Control';
 $currentPage = 'students';
 include __DIR__ . '/../includes/header.php';
 ?>
 
-<!-- Executive Header Card -->
-<div style="background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); color: white; padding: 28px 32px; border-radius: 24px; margin-bottom: 28px; box-shadow: 0 12px 30px -10px rgba(15, 23, 42, 0.3);">
+<!-- Executive Header Card (Dashboard Themed) -->
+<div style="background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); color: white; padding: 28px 32px; border-radius: 24px; margin-bottom: 28px; box-shadow: 0 12px 30px -10px rgba(15, 23, 42, 0.3); border: 1px solid rgba(255, 255, 255, 0.08);">
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
         <div>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; background: rgba(59, 130, 246, 0.2); color: #60A5FA; padding: 4px 10px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.3);">University Placement Directorate</span>
+                <span style="font-size: 11px; font-weight: 800; color: #94A3B8;">•</span>
+                <span style="font-size: 11.5px; font-weight: 700; color: #38BDF8;"><?= ($yearFilter > 0 ? $yearFilter . ' Academic Batch' : 'All Cohort Years (All Time)'); ?></span>
+            </div>
             <h3 style="font-size: 24px; font-weight: 800; color: #FFFFFF; letter-spacing: -0.5px; margin-bottom: 6px;">
                 🎓 Master Cohort Placement Roster
             </h3>
@@ -548,14 +577,14 @@ include __DIR__ . '/../includes/header.php';
         
         <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
             <!-- Live Search Bar with Cancel Search Option -->
-            <form method="GET" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <form method="GET" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 0;">
                 <input type="hidden" name="branch" value="<?= htmlspecialchars($branchFilter); ?>">
                 <input type="hidden" name="year" value="<?= $yearFilter; ?>">
                 <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter); ?>">
                 <input type="hidden" name="view" value="<?= htmlspecialchars($viewMode); ?>">
                 
                 <div style="position: relative; display: flex; align-items: center;">
-                    <input type="text" name="q" value="<?= htmlspecialchars($searchQuery); ?>" placeholder="Search candidate name / enrollment..." style="padding: 10px 34px 10px 38px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: white; font-size: 13px; outline: none; width: 240px;">
+                    <input type="text" name="q" value="<?= htmlspecialchars($searchQuery); ?>" placeholder="Search name / enrollment..." style="padding: 10px 34px 10px 38px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: white; font-size: 13px; outline: none; width: 230px;">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2.5" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%);"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                     <?php if ($searchQuery): ?>
                         <a href="students.php?view=<?= htmlspecialchars($viewMode); ?>&branch=<?= urlencode($branchFilter); ?>&year=<?= $yearFilter; ?>&status=<?= urlencode($statusFilter); ?>" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #94A3B8; text-decoration: none; font-size: 14px; font-weight: 800;" title="Clear Search">✕</a>
@@ -565,13 +594,17 @@ include __DIR__ . '/../includes/header.php';
 
                 <?php if (!empty($searchQuery)): ?>
                     <a href="students.php?view=<?= htmlspecialchars($viewMode); ?>&branch=<?= urlencode($branchFilter); ?>&year=<?= $yearFilter; ?>&status=<?= urlencode($statusFilter); ?>" class="btn-secondary" style="padding: 10px 14px; font-size: 13px; border-radius: 12px; font-weight: 800; background: rgba(239, 68, 68, 0.2); color: #FECDD3; border: 1px solid rgba(239, 68, 68, 0.3); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;" title="Clear search query">
-                        ✖ Cancel Search
+                        ✖ Clear
                     </a>
                 <?php endif; ?>
             </form>
 
-            <a href="students.php?export_csv=1&branch=<?= urlencode($branchFilter); ?>&year=<?= $yearFilter; ?>&status=<?= urlencode($statusFilter); ?>&q=<?= urlencode($searchQuery); ?>" class="btn-secondary" style="display: inline-flex; align-items: center; gap: 8px; border-radius: 12px; padding: 10px 18px; font-weight: 800; background: #3B82F6; color: white; border: none; box-shadow: 0 4px 14px rgba(59,130,246,0.3);">
-                📊 Export Roster CSV
+            <button type="button" onclick="openModal('importStudentsModal')" class="btn-secondary" style="display: inline-flex; align-items: center; gap: 8px; border-radius: 12px; padding: 10px 16px; font-weight: 800; background: rgba(255,255,255,0.12); color: white; border: 1px solid rgba(255,255,255,0.2); cursor: pointer;">
+                📥 Import CSV
+            </button>
+
+            <a href="students.php?export_csv=1&branch=<?= urlencode($branchFilter); ?>&year=<?= $yearFilter; ?>&status=<?= urlencode($statusFilter); ?>&q=<?= urlencode($searchQuery); ?>" class="btn-secondary" style="display: inline-flex; align-items: center; gap: 8px; border-radius: 12px; padding: 10px 16px; font-weight: 800; background: #3B82F6; color: white; border: none; box-shadow: 0 4px 14px rgba(59,130,246,0.3);">
+                📊 Export CSV
             </a>
         </div>
     </div>
@@ -580,73 +613,89 @@ include __DIR__ . '/../includes/header.php';
 <?php if ($msg): ?><div class="badge-status placed" style="margin-bottom: 20px; display: block; font-size: 14px; padding: 12px 20px; border-radius: 14px; font-weight: 800;"><?= htmlspecialchars($msg); ?></div><?php endif; ?>
 <?php if ($error): ?><div class="badge-status unplaced" style="margin-bottom: 20px; display: block; font-size: 14px; padding: 12px 20px; border-radius: 14px; font-weight: 800;"><?= htmlspecialchars($error); ?></div><?php endif; ?>
 
-<!-- Executive Summary KPI Cards Row (4 Core Placement Metrics) -->
+<!-- Executive Summary KPI Cards Row (Theme-matched with Admin Dashboard) -->
 <div class="kpi-grid" style="grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 28px;">
-    <div class="kpi-card" style="padding: 20px 24px; border-radius: 20px;">
-        <div class="kpi-icon blue">🎓</div>
-        <div>
-            <div class="kpi-value"><?= $totalCount; ?></div>
-            <div class="kpi-label">Active Candidate Pool</div>
+    <div class="kpi-card" style="animation-delay: 0.05s; padding: 22px 24px; border-radius: 20px; background: white; border: 1px solid var(--border-color); box-shadow: 0 4px 14px rgba(0,0,0,0.03); transition: all 0.3s ease;">
+        <div class="kpi-top" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <span class="kpi-title" style="font-size: 13px; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Candidate Pool</span>
+            <div class="kpi-icon blue">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+            </div>
         </div>
+        <div class="kpi-value" style="font-size: 32px; font-weight: 900; color: #0F172A; line-height: 1.1; margin-bottom: 8px;"><?= number_format($totalCount); ?></div>
+        <span class="kpi-badge up" style="font-size: 11.5px; font-weight: 800; padding: 4px 10px; border-radius: 20px;">↑ <?= ($yearFilter > 0 ? $yearFilter . ' Batch' : 'All Cohorts (All Time)'); ?></span>
     </div>
 
-    <div class="kpi-card" style="padding: 20px 24px; border-radius: 20px;">
-        <div class="kpi-icon green">🎉</div>
-        <div>
-            <div class="kpi-value" style="color: #10B981;"><?= $placedCount; ?></div>
-            <div class="kpi-label">Confirmed Placements</div>
+    <div class="kpi-card" style="animation-delay: 0.1s; padding: 22px 24px; border-radius: 20px; background: white; border: 1px solid var(--border-color); box-shadow: 0 4px 14px rgba(0,0,0,0.03); transition: all 0.3s ease;">
+        <div class="kpi-top" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <span class="kpi-title" style="font-size: 13px; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Confirmed Placements</span>
+            <div class="kpi-icon green">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
         </div>
+        <div class="kpi-value" style="font-size: 32px; font-weight: 900; color: #10B981; line-height: 1.1; margin-bottom: 8px;"><?= number_format($placedCount); ?></div>
+        <span class="kpi-badge up" style="font-size: 11.5px; font-weight: 800; padding: 4px 10px; border-radius: 20px; background: #ECFDF5; color: #059669;">↑ <?= $placementRate; ?>% Placement Ratio</span>
     </div>
 
-    <div class="kpi-card" style="padding: 20px 24px; border-radius: 20px;">
-        <div class="kpi-icon amber">⏳</div>
-        <div>
-            <div class="kpi-value" style="color: #F59E0B;"><?= $inProcessCount; ?></div>
-            <div class="kpi-label">Pipeline In-Process</div>
+    <div class="kpi-card" style="animation-delay: 0.15s; padding: 22px 24px; border-radius: 20px; background: white; border: 1px solid var(--border-color); box-shadow: 0 4px 14px rgba(0,0,0,0.03); transition: all 0.3s ease;">
+        <div class="kpi-top" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <span class="kpi-title" style="font-size: 13px; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Pipeline In-Process</span>
+            <div class="kpi-icon orange">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
         </div>
+        <div class="kpi-value" style="font-size: 32px; font-weight: 900; color: #F59E0B; line-height: 1.1; margin-bottom: 8px;"><?= number_format($inProcessCount); ?></div>
+        <span class="kpi-badge up" style="font-size: 11.5px; font-weight: 800; padding: 4px 10px; border-radius: 20px; background: #FFFBEB; color: #B45309;">⏳ Interview Stages</span>
     </div>
 
-    <div class="kpi-card" style="padding: 20px 24px; border-radius: 20px;">
-        <div class="kpi-icon red">🎯</div>
-        <div>
-            <div class="kpi-value" style="color: #EF4444;"><?= $unplacedCount; ?></div>
-            <div class="kpi-label">Available Unplaced</div>
+    <div class="kpi-card" style="animation-delay: 0.2s; padding: 22px 24px; border-radius: 20px; background: white; border: 1px solid var(--border-color); box-shadow: 0 4px 14px rgba(0,0,0,0.03); transition: all 0.3s ease;">
+        <div class="kpi-top" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <span class="kpi-title" style="font-size: 13px; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Available Unplaced</span>
+            <div class="kpi-icon purple">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            </div>
         </div>
+        <div class="kpi-value" style="font-size: 32px; font-weight: 900; color: #6366F1; line-height: 1.1; margin-bottom: 8px;"><?= number_format($unplacedCount); ?></div>
+        <span class="kpi-badge info" style="font-size: 11.5px; font-weight: 800; padding: 4px 10px; border-radius: 20px; background: #EEF2FF; color: #4F46E5;">🎯 Open for Campus Drives</span>
     </div>
 </div>
 
 <!-- Multi-Dimensional Filter Bar with Search Clear -->
 <div class="table-card" style="padding: 18px 24px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; background: white; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: 0 4px 14px rgba(0,0,0,0.03);">
-    <form method="GET" style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+    <form method="GET" style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 0;">
         <input type="hidden" name="view" value="<?= htmlspecialchars($viewMode); ?>">
         <input type="hidden" name="q" value="<?= htmlspecialchars($searchQuery); ?>">
         
-        <select name="branch" class="select-pill" onchange="this.form.submit()" style="padding: 9px 18px; font-weight: 700; border-radius: 12px;">
+        <!-- Batch Year Filter with ALL TIME Option -->
+        <select name="year" class="select-pill" onchange="this.form.submit()" style="padding: 9px 18px; font-weight: 700; border-radius: 12px; cursor: pointer;">
+            <option value="0" <?= ($yearFilter === 0) ? 'selected' : ''; ?>>🌐 All Time / All Batch Years</option>
+            <option value="2026" <?= ($yearFilter === 2026) ? 'selected' : ''; ?>>📅 2026 Batch (Current Year)</option>
+            <option value="2025" <?= ($yearFilter === 2025) ? 'selected' : ''; ?>>📅 2025 Batch</option>
+            <option value="2024" <?= ($yearFilter === 2024) ? 'selected' : ''; ?>>📅 2024 Batch</option>
+        </select>
+
+        <!-- Branch Filter -->
+        <select name="branch" class="select-pill" onchange="this.form.submit()" style="padding: 9px 18px; font-weight: 700; border-radius: 12px; cursor: pointer;">
             <option value="">All Academic Branches</option>
-            <option value="CSE" <?= ($branchFilter==='CSE')?'selected':''; ?>>CSE Branch</option>
-            <option value="IT" <?= ($branchFilter==='IT')?'selected':''; ?>>IT Branch</option>
-            <option value="ECE" <?= ($branchFilter==='ECE')?'selected':''; ?>>ECE Branch</option>
-            <option value="MECH" <?= ($branchFilter==='MECH')?'selected':''; ?>>MECH Branch</option>
-            <option value="CIVIL" <?= ($branchFilter==='CIVIL')?'selected':''; ?>>CIVIL Branch</option>
+            <option value="CSE" <?= ($branchFilter==='CSE')?'selected':''; ?>>💻 CSE Branch</option>
+            <option value="IT" <?= ($branchFilter==='IT')?'selected':''; ?>>🌐 IT Branch</option>
+            <option value="ECE" <?= ($branchFilter==='ECE')?'selected':''; ?>>⚡ ECE Branch</option>
+            <option value="MECH" <?= ($branchFilter==='MECH')?'selected':''; ?>>⚙️ MECH Branch</option>
+            <option value="CIVIL" <?= ($branchFilter==='CIVIL')?'selected':''; ?>>🏗️ CIVIL Branch</option>
         </select>
 
-        <select name="year" class="select-pill" onchange="this.form.submit()" style="padding: 9px 18px; font-weight: 700; border-radius: 12px;">
-            <option value="2026" <?= ($yearFilter===2026)?'selected':''; ?>>📅 2026 Batch (Current Year)</option>
-            <option value="2025" <?= ($yearFilter===2025)?'selected':''; ?>>📅 2025 Batch</option>
-            <option value="2024" <?= ($yearFilter===2024)?'selected':''; ?>>📅 2024 Batch</option>
-            <option value="all" <?= ($yearFilter===0)?'selected':''; ?>>All Batch Years</option>
-        </select>
-
-        <select name="status" class="select-pill" onchange="this.form.submit()" style="padding: 9px 18px; font-weight: 700; border-radius: 12px;">
+        <!-- Status Filter -->
+        <select name="status" class="select-pill" onchange="this.form.submit()" style="padding: 9px 18px; font-weight: 700; border-radius: 12px; cursor: pointer;">
             <option value="">All Placement Pipeline States</option>
             <option value="Placed" <?= ($statusFilter==='Placed')?'selected':''; ?>>🎉 Placed Candidates Only</option>
             <option value="In-Process" <?= ($statusFilter==='In-Process')?'selected':''; ?>>⏳ In-Process Pipeline Only</option>
             <option value="Unplaced" <?= ($statusFilter==='Unplaced')?'selected':''; ?>>🎯 Unplaced Candidates Only</option>
         </select>
 
-        <?php if ($branchFilter || $yearFilter || $statusFilter || $searchQuery): ?>
-            <a href="students.php?view=<?= htmlspecialchars($viewMode); ?>" class="btn-secondary" style="padding: 9px 16px; font-size: 13px; border-radius: 12px; font-weight: 800; background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; text-decoration: none;">
-                ↺ Show All Cards (Reset Filters)
+        <!-- Reset All Filters Button (Always explicitly resets to year=0 / all cohorts) -->
+        <?php if ($branchFilter || $yearFilter > 0 || $statusFilter || $searchQuery): ?>
+            <a href="students.php?view=<?= htmlspecialchars($viewMode); ?>&year=0" class="btn-secondary" style="padding: 9px 16px; font-size: 13px; border-radius: 12px; font-weight: 800; background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                ↺ Reset All Filters
             </a>
         <?php endif; ?>
     </form>
@@ -698,7 +747,17 @@ include __DIR__ . '/../includes/header.php';
                             <h4 style="font-size: 16px; font-weight: 800; color: #0F172A; margin: 0;">
                                 <?= htmlspecialchars($st['full_name']); ?>
                             </h4>
-                            <code style="font-size: 11.5px; color: #2563EB; font-weight: 800; display: inline-block; margin-top: 2px;"><?= htmlspecialchars($st['enrollment_no']); ?></code>
+                            <?php
+                            $batchBadgeStyle = ($st['batch_year'] == 2026) 
+                                ? 'background: #ECFEFF; color: #0891B2; border: 1px solid #A5F3FC;' 
+                                : (($st['batch_year'] == 2025) 
+                                    ? 'background: #F5F3FF; color: #7C3AED; border: 1px solid #DDD6FE;' 
+                                    : 'background: #FFFBEB; color: #D97706; border: 1px solid #FDE68A;');
+                            ?>
+                            <div style="display: flex; align-items: center; gap: 6px; margin-top: 3px;">
+                                <code style="font-size: 11.5px; color: #2563EB; font-weight: 800;"><?= htmlspecialchars($st['enrollment_no']); ?></code>
+                                <span style="font-size: 10.5px; font-weight: 800; padding: 1px 7px; border-radius: 6px; <?= $batchBadgeStyle; ?>">Batch '<?= substr($st['batch_year'], -2); ?></span>
+                            </div>
                         </div>
                     </div>
 
@@ -707,11 +766,15 @@ include __DIR__ . '/../includes/header.php';
                     </span>
                 </div>
 
-                <!-- Academic Specs Grid -->
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 12px; border-radius: 14px; margin-bottom: 16px; text-align: center;">
+                <!-- Academic Specs Grid (4-Column) -->
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 12px; border-radius: 14px; margin-bottom: 16px; text-align: center;">
                     <div>
                         <span style="font-size: 10px; font-weight: 800; color: #64748B; text-transform: uppercase; display: block;">Branch</span>
                         <strong style="font-size: 12px; color: #0F172A;"><?= htmlspecialchars($st['branch']); ?></strong>
+                    </div>
+                    <div>
+                        <span style="font-size: 10px; font-weight: 800; color: #64748B; text-transform: uppercase; display: block;">Batch</span>
+                        <strong style="font-size: 12px; color: #4338CA;"><?= htmlspecialchars($st['batch_year']); ?></strong>
                     </div>
                     <div>
                         <span style="font-size: 10px; font-weight: 800; color: #64748B; text-transform: uppercase; display: block;">CPI Score</span>
@@ -733,6 +796,16 @@ include __DIR__ . '/../includes/header.php';
                         <?php if ($st['top_package_ctc']): ?>
                             • <strong style="color: #10B981;"><?= htmlspecialchars($st['top_package_ctc']); ?></strong>
                         <?php endif; ?>
+                    </div>
+                <?php elseif ($st['placement_status'] === 'In-Process'): ?>
+                    <div style="background: #FFFBEB; border: 1px solid #FDE68A; padding: 10px 14px; border-radius: 12px; margin-bottom: 16px;">
+                        <span style="font-size: 11px; font-weight: 800; color: #B45309; text-transform: uppercase; display: block;">⏳ Pipeline Stage:</span>
+                        <strong style="font-size: 13px; color: #92400E;">Active in Recruitment & Technical Interview Rounds</strong>
+                    </div>
+                <?php else: ?>
+                    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 10px 14px; border-radius: 12px; margin-bottom: 16px;">
+                        <span style="font-size: 11px; font-weight: 800; color: #64748B; text-transform: uppercase; display: block;">🎯 Candidate Availability:</span>
+                        <strong style="font-size: 13px; color: #334155;">Available & Eligible for Campus Recruitment Drives</strong>
                     </div>
                 <?php endif; ?>
             </div>
@@ -821,8 +894,17 @@ include __DIR__ . '/../includes/header.php';
                             </div>
                         </td>
                         <td style="padding: 14px 16px;">
-                            <span class="branch-badge"><?= htmlspecialchars($st['branch']); ?></span>
-                            <span style="font-size: 12px; color: #64748B; font-weight: 700;">Batch '<?= substr($st['batch_year'], -2); ?></span>
+                            <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
+                                <span class="branch-badge"><?= htmlspecialchars($st['branch']); ?></span>
+                                <?php
+                                $bStyle = ($st['batch_year'] == 2026) 
+                                    ? 'background: #ECFEFF; color: #0891B2; border: 1px solid #A5F3FC;' 
+                                    : (($st['batch_year'] == 2025) 
+                                        ? 'background: #F5F3FF; color: #7C3AED; border: 1px solid #DDD6FE;' 
+                                        : 'background: #FFFBEB; color: #D97706; border: 1px solid #FDE68A;');
+                                ?>
+                                <span style="font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 6px; <?= $bStyle; ?>">Batch '<?= substr($st['batch_year'], -2); ?></span>
+                            </div>
                         </td>
                         <td style="padding: 14px 16px;"><strong style="color: #2563EB; font-size: 14px;">★ <?= number_format($st['cpi'], 2); ?></strong></td>
                         <td style="padding: 14px 16px;"><strong style="color: <?= ($st['backlogs']>0?'#EF4444':'#10B981'); ?>; font-size: 14px;"><?= $st['backlogs']; ?></strong></td>
