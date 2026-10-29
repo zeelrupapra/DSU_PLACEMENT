@@ -282,6 +282,9 @@ function ensureSchemaExists($pdo) {
         try { $pdo->exec("ALTER TABLE `internships` ADD COLUMN `verification_status` ENUM('Pending', 'Verified', 'Rejected') DEFAULT 'Pending'"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE `internships` ADD COLUMN `credit_points` INT DEFAULT 3"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE `internships` ADD COLUMN `faculty_remarks` TEXT DEFAULT NULL"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE `mous` ADD COLUMN `mou_document` VARCHAR(255) DEFAULT NULL"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE `mous` ADD COLUMN `region` VARCHAR(150) DEFAULT 'Gujarat'"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE `mous` ADD COLUMN `reason` TEXT DEFAULT NULL"); } catch (Exception $e) {}
 
     } catch (PDOException $e) {
         // Non-fatal safety fallback
@@ -538,4 +541,145 @@ function sendPortalEmail($toEmail, $subject, $bodyHtml, $pdo = null) {
     @mail($toEmail, $subject, $bodyHtml, $headers);
     return true;
 }
-?>
+// Unified Campus Drive Eligibility & Application Verification Helper
+function checkDriveEligibilityDetails($student, $drv) {
+    $reasons = [];
+
+    // 1. Account Detained Check
+    $isDetained = (!empty($student['is_detained']) && $student['is_detained'] == 1);
+    if ($isDetained) {
+        $reasons[] = "Account Detained: Currently restricted by Placement Directorate";
+    }
+
+    // 2. Placement Status Check (with Dream Company Policy Support)
+    $isPlaced = ($student['placement_status'] === 'Placed');
+    $isDreamOpportunity = false;
+    if ($isPlaced) {
+        $pdo = getDBConnection();
+        $targetCtc = isset($drv['package_numeric']) && $drv['package_numeric'] > 0 
+            ? floatval($drv['package_numeric']) 
+            : parsePackageNumeric($drv['package_ctc'] ?? '');
+        $currentPlacedCtc = parsePackageNumeric($student['placed_companies'] ?? '');
+        
+        $multiplier = 1.30;
+        try {
+            $rowM = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'higher_package_min_multiplier'")->fetch();
+            if ($rowM && floatval($rowM['setting_value']) > 1.0) $multiplier = floatval($rowM['setting_value']);
+        } catch (Exception $e) {}
+
+        if ($currentPlacedCtc > 0 && $targetCtc >= ($currentPlacedCtc * $multiplier)) {
+            $isDreamOpportunity = true;
+        } else {
+            $reasons[] = "You are already placed (Exempt from further campus drives)";
+        }
+    }
+
+    // 3. Application Deadline Check
+    $isDeadlinePassed = false;
+    if (!empty($drv['deadline'])) {
+        $timeStr = !empty($drv['deadline_time']) ? trim($drv['deadline_time']) : '23:59:59';
+        if (strlen($timeStr) === 5) { $timeStr .= ':00'; }
+        $deadlineTs = strtotime($drv['deadline'] . ' ' . $timeStr);
+        if ($deadlineTs !== false && $deadlineTs < time()) {
+            $isDeadlinePassed = true;
+            $reasons[] = "Application window expired on " . date('d M Y, h:i A', $deadlineTs);
+        }
+    }
+
+    // 4. Academic CPI Criteria Check
+    $studentCpi = floatval($student['cpi'] ?? 0);
+    $minCpi = floatval($drv['min_cpi'] ?? 0);
+    $isCpiEligible = true;
+    if ($minCpi > 0) {
+        // Generous precision tolerance to prevent float inaccuracies (e.g., 7.50 vs 7.5000001)
+        if (round($studentCpi, 2) < (round($minCpi, 2) - 0.001)) {
+            $isCpiEligible = false;
+            $reasons[] = "Academic CPI below required threshold (Min ★" . number_format($minCpi, 2) . " required, your CPI: ★" . number_format($studentCpi, 2) . ")";
+        }
+    }
+
+    // 5. Academic Branch Eligibility Check
+    $studentBranch = strtoupper(trim($student['branch'] ?? ''));
+    $rawAllowed = strtoupper(trim($drv['allowed_branches'] ?? ''));
+    $isBranchEligible = true;
+
+    if (!empty($rawAllowed) && !preg_match('/\b(ALL|ANY|OPEN|EVERY)\b/', $rawAllowed)) {
+        $tokens = preg_split('/[,;\/|\s]+/', $rawAllowed, -1, PREG_SPLIT_NO_EMPTY);
+        $allowedList = array_map('trim', $tokens);
+
+        // Branch equivalence mapping for student and drive specifications
+        $synonyms = [
+            'CSE' => ['CSE', 'CS', 'COMPUTER', 'COMPUTERSCIENCE', 'COMPUTERENGINEERING', 'CE'],
+            'IT' => ['IT', 'INFORMATIONTECHNOLOGY', 'INFOTECH'],
+            'ECE' => ['ECE', 'EC', 'ELECTRONICS', 'ELECTRONICSCOMMUNICATION', 'ELECTRONICSANDCOMMUNICATION'],
+            'MECH' => ['MECH', 'ME', 'MECHANICAL', 'MECHANICALENGINEERING'],
+            'CIVIL' => ['CIVIL', 'CIVILENGINEERING']
+        ];
+
+        $matched = false;
+        $cleanStudent = preg_replace('/[^A-Z]/', '', $studentBranch);
+        $studentSyns = $synonyms[$studentBranch] ?? [$studentBranch, $cleanStudent];
+
+        foreach ($allowedList as $allow) {
+            $cleanAllow = preg_replace('/[^A-Z]/', '', $allow);
+            if (in_array($allow, $studentSyns) || in_array($cleanAllow, $studentSyns)) {
+                $matched = true;
+                break;
+            }
+        }
+
+        if (!$matched) {
+            $isBranchEligible = false;
+            $reasons[] = "Branch not included in target branches ({$drv['allowed_branches']})";
+        }
+    }
+
+    // 6. Backlog Criteria Check
+    $studentBacklogs = intval($student['backlogs'] ?? 0);
+    $isBacklogEligible = true;
+    if (isset($drv['max_backlogs']) && $drv['max_backlogs'] !== '' && $drv['max_backlogs'] !== null) {
+        $maxBacklogs = intval($drv['max_backlogs']);
+        if ($maxBacklogs >= 0 && $studentBacklogs > $maxBacklogs) {
+            $isBacklogEligible = false;
+            $reasons[] = "Active backlogs exceed maximum allowed (Max {$maxBacklogs} allowed, you have {$studentBacklogs})";
+        }
+    }
+
+    // Criteria fulfillment
+    $isCriteriaEligible = $isCpiEligible && $isBranchEligible && $isBacklogEligible;
+
+    // Can apply determination
+    $placementBlock = ($isPlaced && !$isDreamOpportunity);
+    $canApply = $isCriteriaEligible && !$isDetained && !$placementBlock && !$isDeadlinePassed;
+
+    // Friendly button badge description
+    $buttonBadge = '';
+    if ($placementBlock) {
+        $buttonBadge = '🎉 You are already placed';
+    } elseif ($isDetained) {
+        $buttonBadge = '⛔ Ineligible: Account Detained';
+    } elseif ($isDeadlinePassed) {
+        $buttonBadge = '⌛ Application Deadline Expired';
+    } elseif (!$isCpiEligible) {
+        $buttonBadge = '⚠️ Ineligible: Min CPI ★' . number_format($minCpi, 2) . ' Required';
+    } elseif (!$isBranchEligible) {
+        $buttonBadge = '⚠️ Ineligible: ' . $drv['allowed_branches'] . ' Only';
+    } elseif (!$isBacklogEligible) {
+        $buttonBadge = '⚠️ Ineligible: Max ' . intval($drv['max_backlogs']) . ' Backlogs';
+    }
+
+    return [
+        'is_eligible' => $isCriteriaEligible,
+        'can_apply' => $canApply,
+        'is_cpi_eligible' => $isCpiEligible,
+        'is_branch_eligible' => $isBranchEligible,
+        'is_backlog_eligible' => $isBacklogEligible,
+        'is_deadline_passed' => $isDeadlinePassed,
+        'is_detained' => $isDetained,
+        'is_placed' => $isPlaced,
+        'is_dream_opportunity' => $isDreamOpportunity,
+        'button_badge' => $buttonBadge,
+        'reasons' => $reasons,
+        'primary_reason' => !empty($reasons) ? $reasons[0] : ''
+    ];
+}

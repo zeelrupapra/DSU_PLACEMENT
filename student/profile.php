@@ -185,6 +185,9 @@ include __DIR__ . '/../includes/header.php';
                         <span>🎓 <?= htmlspecialchars($student['branch']); ?> Branch</span> • 
                         <span>Batch <?= $student['batch_year']; ?></span> • 
                         <code><?= htmlspecialchars($student['enrollment_no']); ?></code>
+                        <?php if ($student['placement_status'] === 'Placed'): ?>
+                            • <span class="badge-status placed" style="font-size: 11px; padding: 3px 8px; border-radius: 6px;">🎉 You are already placed</span>
+                        <?php endif; ?>
                     </p>
                 </div>
             </div>
@@ -312,7 +315,7 @@ include __DIR__ . '/../includes/header.php';
                         <div>
                             <span style="font-size: 11px; font-weight: 800; color: #ECFDF5; background: rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;">🎉 Verified Campus Placement</span>
                             <h4 style="font-size: 17px; font-weight: 900; color: #FFFFFF; margin-top: 6px; margin-bottom: 2px;">
-                                Placed at: <?= htmlspecialchars(!empty($student['placed_companies']) ? $student['placed_companies'] : 'Corporate Placement Partner'); ?>
+                                You are already placed at: <?= htmlspecialchars(!empty($student['placed_companies']) ? $student['placed_companies'] : 'Corporate Placement Partner'); ?>
                             </h4>
                             <p style="font-size: 12px; color: #A7F3D0; margin: 0; font-weight: 600;">Issued & Verified by Training & Placement Cell, Dr. Subhash University.</p>
                         </div>

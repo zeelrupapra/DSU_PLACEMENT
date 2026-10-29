@@ -39,25 +39,16 @@ if (isset($_GET['get_drive_details']) && isset($_GET['drive_id'])) {
     $stmtAppChk->execute([$studentId, $dId]);
     $myApp = $stmtAppChk->fetch();
 
-    // Check eligibility
-    $studentBranch = strtoupper(trim($student['branch']));
-    $allowedBranches = array_map('trim', explode(',', strtoupper($drvDetail['allowed_branches'])));
-    $isBranchEligible = in_array('ALL', $allowedBranches) || in_array($studentBranch, $allowedBranches);
-    $isCpiEligible = ($student['cpi'] >= $drvDetail['min_cpi']);
-    $isBacklogEligible = ($student['backlogs'] <= $drvDetail['max_backlogs']);
-    $isDetained = ($student['is_detained'] == 1);
-    $isPlaced = ($student['placement_status'] === 'Placed');
-
-    $isDeadlinePassed = false;
-    if ($drvDetail['deadline']) {
-        $dlTimeStr = $drvDetail['deadline'] . ' ' . ($drvDetail['deadline_time'] ?: '23:59:59');
-        if (strtotime($dlTimeStr) < time()) {
-            $isDeadlinePassed = true;
-        }
-    }
-
-    $isEligible = $isBranchEligible && $isCpiEligible && $isBacklogEligible;
-    $canApply = $isEligible && !$isDetained && !$isPlaced && !$isDeadlinePassed;
+    // Check unified eligibility
+    $elig = checkDriveEligibilityDetails($student, $drvDetail);
+    $isBranchEligible = $elig['is_branch_eligible'];
+    $isCpiEligible = $elig['is_cpi_eligible'];
+    $isBacklogEligible = $elig['is_backlog_eligible'];
+    $isDetained = $elig['is_detained'];
+    $isPlaced = $elig['is_placed'];
+    $isDeadlinePassed = $elig['is_deadline_passed'];
+    $isEligible = $elig['is_eligible'];
+    $canApply = $elig['can_apply'];
     ?>
 
     <!-- Drive Header Card -->
@@ -124,14 +115,14 @@ if (isset($_GET['get_drive_details']) && isset($_GET['drive_id'])) {
                     Application Pipeline Status: <?= htmlspecialchars($myApp['status']); ?>
                 </span>
             </div>
-        <?php elseif ($isPlaced): ?>
-            <span class="badge-status placed" style="font-size: 14px; padding: 10px 20px; font-weight: 800; border-radius: 12px;">🎉 You are already PLACED! Exempt from further drive applications.</span>
+        <?php elseif ($isPlaced && empty($elig['is_dream_opportunity'])): ?>
+            <span class="badge-status placed" style="font-size: 14px; padding: 10px 20px; font-weight: 800; border-radius: 12px;">🎉 You are already placed! Exempt from further drive applications.</span>
         <?php elseif ($isDetained): ?>
             <span class="badge-status detained" style="font-size: 14px; padding: 10px 20px; font-weight: 800; border-radius: 12px;">⛔ Account Detained: Ineligible to apply.</span>
         <?php elseif ($isDeadlinePassed): ?>
             <span class="badge-status unplaced" style="font-size: 14px; padding: 10px 20px; font-weight: 800; border-radius: 12px;">⌛ Application Deadline Expired</span>
         <?php elseif (!$isEligible): ?>
-            <span class="badge-status unplaced" style="font-size: 14px; padding: 10px 20px; font-weight: 800; border-radius: 12px;">⚠️ Ineligible for this Drive (CPI/Branch Criteria)</span>
+            <span class="badge-status unplaced" style="font-size: 14px; padding: 10px 20px; font-weight: 800; border-radius: 12px;" title="<?= htmlspecialchars($elig['primary_reason']); ?>">⚠️ Ineligible: <?= htmlspecialchars($elig['primary_reason'] ?: 'CPI / Branch Criteria'); ?></span>
         <?php else: ?>
             <form method="POST">
                 <input type="hidden" name="action" value="apply">
@@ -152,32 +143,55 @@ if (isset($_GET['get_drive_details']) && isset($_GET['drive_id'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'apply') {
     $driveId = intval($_POST['drive_id']);
 
-    if ($student['is_detained'] == 1) {
+    // Fetch the target drive to evaluate eligibility
+    $stmtCheckDrv = $pdo->prepare("SELECT d.*, c.company_name FROM drives d JOIN companies c ON d.company_id = c.id WHERE d.id = ?");
+    $stmtCheckDrv->execute([$driveId]);
+    $targetDrive = $stmtCheckDrv->fetch();
+
+    $elig = $targetDrive ? checkDriveEligibilityDetails($student, $targetDrive) : null;
+
+    if (!$targetDrive) {
+        $error = "Selected placement drive could not be located.";
+    } elseif ($student['is_detained'] == 1) {
         $error = "Account Detained by Admin - You are currently ineligible to apply for placement drives.";
-    } elseif ($student['placement_status'] === 'Placed') {
-        $error = "You are already PLACED! As per university policy, placed candidates are exempt from applying to further drives.";
-    } elseif (empty($student['resume_file']) || $student['resume_file'] === 'default_resume.pdf') {
-        $error = "Please upload your official Resume (PDF) in 'My Profile' before applying for campus drives.";
+    } elseif ($student['placement_status'] === 'Placed' && empty($elig['is_dream_opportunity'])) {
+        $error = "You are already placed! As per university policy, placed candidates are exempt from applying to further drives.";
+    } elseif ($elig && !$elig['can_apply']) {
+        $error = !empty($elig['primary_reason']) ? $elig['primary_reason'] : "You do not fulfill the eligibility criteria for this recruitment drive.";
     } else {
-        try {
-            $pdo->beginTransaction();
-
-            // Insert Application
-            $stmtApp = $pdo->prepare("INSERT INTO applications (drive_id, student_id, status) VALUES (?, ?, 'Applied')");
-            $stmtApp->execute([$driveId, $studentId]);
-
-            // Update student placement status to 'In-Process' if currently 'Unplaced'
-            if ($student['placement_status'] === 'Unplaced') {
-                $stmtStUp = $pdo->prepare("UPDATE students SET placement_status = 'In-Process' WHERE id = ?");
-                $stmtStUp->execute([$studentId]);
-                $student['placement_status'] = 'In-Process';
+        // Ensure resume file is accessible or fallback to default_resume.pdf
+        $hasResume = (!empty($student['resume_file']) && file_exists(__DIR__ . '/../uploads/' . $student['resume_file']));
+        if (!$hasResume) {
+            if (file_exists(__DIR__ . '/../uploads/default_resume.pdf')) {
+                $pdo->prepare("UPDATE students SET resume_file = 'default_resume.pdf' WHERE id = ?")->execute([$studentId]);
+                $student['resume_file'] = 'default_resume.pdf';
+                $hasResume = true;
+            } else {
+                $error = "Please upload your official Resume (PDF) in 'My Profile' before applying for campus drives.";
             }
+        }
 
-            $pdo->commit();
-            $msg = "Application submitted successfully! Your candidate pipeline status is set to In-Process.";
-        } catch (Exception $e) {
-            $pdo->rollBack();
-            $error = "You have already applied for this placement drive.";
+        if ($hasResume && empty($error)) {
+            try {
+                $pdo->beginTransaction();
+
+                // Insert Application
+                $stmtApp = $pdo->prepare("INSERT INTO applications (drive_id, student_id, status) VALUES (?, ?, 'Applied')");
+                $stmtApp->execute([$driveId, $studentId]);
+
+                // Update student placement status to 'In-Process' if currently 'Unplaced'
+                if ($student['placement_status'] === 'Unplaced') {
+                    $stmtStUp = $pdo->prepare("UPDATE students SET placement_status = 'In-Process' WHERE id = ?");
+                    $stmtStUp->execute([$studentId]);
+                    $student['placement_status'] = 'In-Process';
+                }
+
+                $pdo->commit();
+                $msg = "Application submitted successfully! Your candidate pipeline status is set to In-Process.";
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                $error = "You have already applied for this placement drive.";
+            }
         }
     }
 }
@@ -229,10 +243,7 @@ foreach ($userAppsRaw as $ua) {
     $userAppsMap[$ua['drive_id']] = $ua;
 }
 
-// Student eligibility helper checks
-$studentBranch = strtoupper(trim($student['branch']));
 $studentCpi = floatval($student['cpi']);
-$studentBacklogs = intval($student['backlogs']);
 $isDetained = ($student['is_detained'] == 1);
 $isPlaced = ($student['placement_status'] === 'Placed');
 
@@ -262,7 +273,7 @@ include __DIR__ . '/../includes/header.php';
 
 <?php if ($student['placement_status'] === 'Placed'): ?>
     <div class="badge-status placed" style="margin-bottom: 20px; display: block; font-size: 14px; padding: 14px 20px; text-align: center; border-radius: 14px; font-weight: 800;">
-        🎉 CONGRATULATIONS! You have been PLACED! As per university policy, placed candidates are exempt from applying to further drives.
+        🎉 You are already placed! As per university policy, placed candidates are exempt from applying to further drives.
     </div>
 <?php endif; ?>
 
@@ -306,20 +317,14 @@ include __DIR__ . '/../includes/header.php';
     <?php 
     $renderedCount = 0;
     foreach ($allDrives as $drv): 
-        $allowedBranches = array_map('trim', explode(',', strtoupper($drv['allowed_branches'])));
-        $isBranchEligible = in_array('ALL', $allowedBranches) || in_array($studentBranch, $allowedBranches);
-        $isCpiEligible = ($studentCpi >= floatval($drv['min_cpi']));
-        $isBacklogEligible = ($studentBacklogs <= intval($drv['max_backlogs']));
-        
-        $isDeadlinePassed = false;
-        if ($drv['deadline']) {
-            $dlTimeStr = $drv['deadline'] . ' ' . ($drv['deadline_time'] ?: '23:59:59');
-            if (strtotime($dlTimeStr) < time()) {
-                $isDeadlinePassed = true;
-            }
-        }
+        $elig = checkDriveEligibilityDetails($student, $drv);
+        $isBranchEligible = $elig['is_branch_eligible'];
+        $isCpiEligible = $elig['is_cpi_eligible'];
+        $isBacklogEligible = $elig['is_backlog_eligible'];
+        $isDeadlinePassed = $elig['is_deadline_passed'];
+        $isEligible = $elig['is_eligible'];
+        $canApply = $elig['can_apply'];
 
-        $isEligible = $isBranchEligible && $isCpiEligible && $isBacklogEligible;
         $hasApplied = isset($userAppsMap[$drv['id']]);
         $appData = $hasApplied ? $userAppsMap[$drv['id']] : null;
 
@@ -393,9 +398,9 @@ include __DIR__ . '/../includes/header.php';
                     <button class="btn-secondary" style="width: 100%; justify-content: center; background: #F1F5F9; color: #334155; font-weight: 800; border-radius: 12px; padding: 10px; cursor: default;" disabled>
                         <span class="badge-status <?= $stBadgeCls; ?>" style="font-size: 12px;">Applied Stage: <?= htmlspecialchars($appSt); ?></span>
                     </button>
-                <?php elseif ($isPlaced): ?>
+                <?php elseif ($isPlaced && empty($elig['is_dream_opportunity'])): ?>
                     <button class="btn-secondary" style="width: 100%; justify-content: center; background: #DCFCE7; color: #15803D; font-weight: 800; border-radius: 12px; padding: 10px; cursor: not-allowed;" disabled>
-                        🎉 Already Placed
+                        🎉 You are already placed
                     </button>
                 <?php elseif ($isDetained): ?>
                     <button class="btn-secondary" style="width: 100%; justify-content: center; background: #FEE2E2; color: #B91C1C; font-weight: 800; border-radius: 12px; padding: 10px; cursor: not-allowed;" disabled>
@@ -406,8 +411,8 @@ include __DIR__ . '/../includes/header.php';
                         ⌛ Application Deadline Expired
                     </button>
                 <?php elseif (!$isEligible): ?>
-                    <button class="btn-secondary" style="width: 100%; justify-content: center; background: #FFFBEB; color: #B45309; font-weight: 700; border-radius: 12px; padding: 10px; cursor: not-allowed;" disabled>
-                        ⚠️ Ineligible (CPI / Branch Criteria)
+                    <button class="btn-secondary" style="width: 100%; justify-content: center; background: #FFFBEB; color: #B45309; font-weight: 700; border-radius: 12px; padding: 10px; cursor: not-allowed;" title="<?= htmlspecialchars($elig['primary_reason']); ?>" disabled>
+                        <?= htmlspecialchars($elig['button_badge'] ?: '⚠️ Ineligible (Criteria Mismatch)'); ?>
                     </button>
                 <?php else: ?>
                     <form method="POST">

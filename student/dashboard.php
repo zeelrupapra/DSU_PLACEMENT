@@ -28,22 +28,20 @@ foreach ($myApplications as $ua) {
 $isPlaced = ($student['placement_status'] === 'Placed');
 $isDetained = ($student['is_detained'] == 1);
 
-// Eligible Active Open Drives
-$stmtEligible = $pdo->prepare("SELECT d.*, c.company_name 
-                               FROM drives d 
-                               JOIN companies c ON d.company_id = c.id 
-                               WHERE c.is_closed = 0 AND d.status = 'Active' AND d.min_cpi <= ? AND d.deadline >= CURDATE() 
-                               ORDER BY d.id DESC");
-$stmtEligible->execute([$student['cpi']]);
-$eligibleDrivesRaw = $stmtEligible->fetchAll();
+// Eligible Active Open Drives using unified eligibility engine
+$stmtDrivesAll = $pdo->query("SELECT d.*, c.company_name 
+                              FROM drives d 
+                              JOIN companies c ON d.company_id = c.id 
+                              WHERE c.is_closed = 0 AND d.status IN ('Active', 'Upcoming')
+                              ORDER BY d.id DESC");
+$allOpenDrives = $stmtDrivesAll->fetchAll();
 
-// Filter by branch eligibility
-$studentBranch = strtoupper(trim($student['branch']));
 $eligibleDrives = [];
-foreach ($eligibleDrivesRaw as $ed) {
-    $allowedBranches = array_map('trim', explode(',', strtoupper($ed['allowed_branches'])));
-    if (in_array('ALL', $allowedBranches) || in_array($studentBranch, $allowedBranches)) {
-        $eligibleDrives[] = $ed;
+foreach ($allOpenDrives as $dr) {
+    $elig = checkDriveEligibilityDetails($student, $dr);
+    if ($elig['is_eligible']) {
+        $dr['eligibility_meta'] = $elig;
+        $eligibleDrives[] = $dr;
     }
 }
 
@@ -71,7 +69,9 @@ include __DIR__ . '/../includes/header.php';
             <div style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); padding: 12px 20px; border-radius: 16px; text-align: center;">
                 <span style="font-size: 11px; color: #94A3B8; font-weight: 700; text-transform: uppercase; display: block;">Placement Status</span>
                 <?php $stCls = ($student['placement_status']==='Placed')?'#10B981':(($student['placement_status']==='In-Process')?'#F59E0B':'#EF4444'); ?>
-                <strong style="font-size: 14px; color: <?= $stCls; ?>; font-weight: 800;"><?= htmlspecialchars($student['placement_status']); ?></strong>
+                <strong style="font-size: 14px; color: <?= $stCls; ?>; font-weight: 800;">
+                    <?= ($student['placement_status']==='Placed') ? 'You are already placed' : htmlspecialchars($student['placement_status']); ?>
+                </strong>
             </div>
         </div>
     </div>
@@ -87,7 +87,7 @@ include __DIR__ . '/../includes/header.php';
             <div>
                 <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">🎉 Verified Campus Placement</span>
                 <h3 style="font-size: 19px; font-weight: 900; margin: 6px 0 4px 0; color: #FFFFFF;">
-                    Placed at: <?= htmlspecialchars(!empty($student['placed_companies']) ? $student['placed_companies'] : 'Corporate Partner'); ?>
+                    You are already placed at: <?= htmlspecialchars(!empty($student['placed_companies']) ? $student['placed_companies'] : 'Corporate Partner'); ?>
                 </h3>
                 <p style="font-size: 13px; opacity: 0.9; margin: 0; font-weight: 600;">Issued by Training & Placement Cell, Dr. Subhash University. Official candidate record verified.</p>
             </div>
@@ -106,7 +106,7 @@ include __DIR__ . '/../includes/header.php';
 
 <?php if ($isPlaced): ?>
     <div class="badge-status placed" style="margin-bottom: 24px; display: block; font-size: 14px; padding: 14px 20px; text-align: center; border-radius: 16px; font-weight: 800;">
-        🎉 CONGRATULATIONS! You have been PLACED! As per university policy, placed candidates are exempt from applying to further campus drives.
+        🎉 You are already placed! As per university policy, placed candidates are exempt from applying to further campus drives.
     </div>
 <?php endif; ?>
 
@@ -128,29 +128,31 @@ include __DIR__ . '/../includes/header.php';
             <table class="custom-table" style="width: 100%;">
                 <thead>
                     <tr style="background: #F8FAFC;">
-                        <th>Recruiter Company</th>
-                        <th>Role Title</th>
-                        <th>Package CTC</th>
-                        <th>Application Status</th>
+                        <th>Target Company</th>
+                        <th>Drive Role</th>
+                        <th>Offered Package</th>
+                        <th>Application Stage</th>
+                        <th>Applied On</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (!empty($myApplications)): ?>
-                        <?php foreach ($myApplications as $app): ?>
+                        <?php foreach (array_slice($myApplications, 0, 5) as $app): ?>
                             <tr>
-                                <td><strong style="color: #0F172A; font-weight: 800;">🏢 <?= htmlspecialchars($app['company_name']); ?></strong></td>
-                                <td style="color: #475569; font-size: 13px;"><?= htmlspecialchars($app['title']); ?></td>
-                                <td><strong style="color: #10B981; font-weight: 800;"><?= htmlspecialchars($app['package_ctc']); ?></strong></td>
+                                <td><strong style="color: #0F172A;"><?= htmlspecialchars($app['company_name']); ?></strong></td>
+                                <td><?= htmlspecialchars($app['title']); ?></td>
+                                <td><span style="color: #10B981; font-weight: 800;"><?= htmlspecialchars($app['package_ctc']); ?></span></td>
                                 <td>
                                     <?php 
                                         $stClass = ($app['status']==='Selected') ? 'placed' : (($app['status']==='Rejected') ? 'unplaced' : 'in-process'); 
                                     ?>
-                                    <span class="badge-status <?= $stClass; ?>" style="font-size: 12px; font-weight: 800;"><?= htmlspecialchars($app['status']); ?></span>
+                                    <span class="badge-status <?= $stClass; ?>" style="font-size: 12px;"><?= htmlspecialchars($app['status']); ?></span>
                                 </td>
+                                <td><span style="font-size: 12px; color: var(--text-muted);"><?= date('d M Y', strtotime($app['applied_date'])); ?></span></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
-                        <tr><td colspan="4" style="color: var(--text-muted); text-align: center; padding: 28px;">You have not applied to any placement drives yet.</td></tr>
+                        <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">You have not applied to any recruitment drives yet.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
@@ -169,14 +171,9 @@ include __DIR__ . '/../includes/header.php';
                 <?php foreach (array_slice($eligibleDrives, 0, 5) as $ed): 
                     $hasApplied = isset($userAppsMap[$ed['id']]);
                     $appData = $hasApplied ? $userAppsMap[$ed['id']] : null;
+                    $eligMeta = $ed['eligibility_meta'] ?? checkDriveEligibilityDetails($student, $ed);
 
-                    $isDeadlinePassed = false;
-                    if (!empty($ed['deadline'])) {
-                        $dlTimeStr = $ed['deadline'] . ' ' . ($ed['deadline_time'] ?: '23:59:59');
-                        if (strtotime($dlTimeStr) < time()) {
-                            $isDeadlinePassed = true;
-                        }
-                    }
+                    $isDeadlinePassed = $eligMeta['is_deadline_passed'];
                 ?>
                     <div style="border: 1px solid #E2E8F0; padding: 16px; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; background: #FFFFFF; flex-wrap: wrap; gap: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.02);">
                         <div>
@@ -194,9 +191,9 @@ include __DIR__ . '/../includes/header.php';
                                 <span class="badge-status <?= $stBadgeCls; ?>" style="font-size: 12px; font-weight: 800; padding: 6px 14px; border-radius: 10px; display: inline-block;">
                                     Applied: <?= htmlspecialchars($appSt); ?>
                                 </span>
-                            <?php elseif ($isPlaced): ?>
+                            <?php elseif ($isPlaced && empty($eligMeta['is_dream_opportunity'])): ?>
                                 <span class="badge-status placed" style="font-size: 12px; font-weight: 800; padding: 6px 14px; border-radius: 10px; background: #DCFCE7; color: #15803D; border: 1px solid #86EFAC; display: inline-block;" title="Placed candidates are exempt from applying further">
-                                    🎉 Already Placed
+                                    🎉 You are already placed
                                 </span>
                             <?php elseif ($isDetained): ?>
                                 <span class="badge-status unplaced" style="font-size: 12px; font-weight: 800; padding: 6px 14px; border-radius: 10px; display: inline-block;">

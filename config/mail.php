@@ -7,9 +7,9 @@ define('SMTP_ENABLED', true);
 define('SMTP_HOST', 'smtp.gmail.com');
 define('SMTP_PORT', 587);
 define('SMTP_SECURE', 'tls');
-define('SMTP_USER', 'mrstrome4@gmail.com');
+define('SMTP_USER', 'rupaparazeel224@gmail.com');
 define('SMTP_PASS', 'Zeel_patel@224');
-define('SMTP_FROM_EMAIL', 'mrstrome4@gmail.com');
+define('SMTP_FROM_EMAIL', 'rupaparazeel224@gmail.com');
 define('SMTP_FROM_NAME', 'Dr. Subhash Placement Cell');
 
 /**
